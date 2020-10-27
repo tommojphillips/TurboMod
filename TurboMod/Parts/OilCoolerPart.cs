@@ -12,7 +12,7 @@ namespace TommoJProductions.TurboMod.Parts
         public override PartSaveInfo defaultPartSaveInfo => new PartSaveInfo()
         {
             installed = false,
-            position = new Vector3(),
+            position = new Vector3(1559.1f, 5, 730),
             rotation = new Quaternion()
         };
 
@@ -34,7 +34,6 @@ namespace TommoJProductions.TurboMod.Parts
 
         public OilCoolerPart(PartSaveInfo inPartSaveInfo, GameObject inPart, GameObject inParent, Trigger inPartTrigger, Vector3 inPartPosition, Quaternion inPartRotation) : base(inPartSaveInfo, inPart, inParent, inPartTrigger, inPartPosition, inPartRotation)
         {
-
         }
 
         #endregion

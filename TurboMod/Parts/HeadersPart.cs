@@ -12,7 +12,7 @@ namespace TommoJProductions.TurboMod.Parts
         public override PartSaveInfo defaultPartSaveInfo => new PartSaveInfo()
         {
             installed = false,
-            position = new Vector3(),
+            position = new Vector3(1561.49f, 5, 730),
             rotation = new Quaternion()
         };
 
@@ -28,13 +28,13 @@ namespace TommoJProductions.TurboMod.Parts
             set;
         }
 
+        internal TurboPart turbo { get { return TurboMod.instance.turboParts.turboPart; } }
         #endregion
 
         #region Constructors
 
         public HeadersPart(PartSaveInfo inPartSaveInfo, GameObject inPart, GameObject inParent, Trigger inPartTrigger, Vector3 inPartPosition, Quaternion inPartRotation) : base(inPartSaveInfo, inPart, inParent, inPartTrigger, inPartPosition, inPartRotation)
         {
-
         }
 
         #endregion
@@ -43,22 +43,24 @@ namespace TommoJProductions.TurboMod.Parts
 
         protected override void assemble(bool inStartup = false)
         {
+            if (!inStartup)
+            {
+                this.turbo.updatePartAndTriggerParent(this.rigidPart.transform, this.turbo.installedPos, this.turbo.installedRot);
+                this.turbo.airFilter.updatePartAndTriggerParent(this.turbo.rigidPart.transform);
+                this.turbo.wastegate.updatePartAndTriggerParent(this.turbo.rigidPart.transform);
+            }
             base.assemble(inStartup);
         }
 
         protected override void disassemble(bool inStartup = false)
         {
+            if (!inStartup)
+            {
+                this.turbo.updatePartAndTriggerParent(this.activePart.transform, this.turbo.installedPos, this.turbo.installedRot);
+                this.turbo.airFilter.updatePartAndTriggerParent(this.turbo.rigidPart.transform);
+                this.turbo.wastegate.updatePartAndTriggerParent(this.turbo.rigidPart.transform);
+            }
             base.disassemble(inStartup);
-        }
-
-        protected override void onTriggerExit(Collider inCollider)
-        {
-            base.onTriggerExit(inCollider);
-        }
-
-        protected override void onTriggerStay(Collider inCollider)
-        {
-            base.onTriggerStay(inCollider);
         }
 
         #endregion
