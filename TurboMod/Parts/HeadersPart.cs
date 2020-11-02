@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace TommoJProductions.TurboMod.Parts
 {
-    class HeadersPart : Part
+    internal class HeadersPart : Part
     {
         // Written, 26.10.2020
 
@@ -46,8 +46,13 @@ namespace TommoJProductions.TurboMod.Parts
             if (!inStartup)
             {
                 this.turbo.updatePartAndTriggerParent(this.rigidPart.transform, this.turbo.installedPos, this.turbo.installedRot);
-                this.turbo.airFilter.updatePartAndTriggerParent(this.turbo.rigidPart.transform);
-                this.turbo.wastegate.updatePartAndTriggerParent(this.turbo.rigidPart.transform);
+                if (this.turbo.installed)
+                {
+                    this.turbo.airFilter.updatePartAndTriggerParent(this.turbo.rigidPart.transform);
+                    this.turbo.highFlowAirFilter.updatePartAndTriggerParent(this.turbo.rigidPart.transform);
+                    this.turbo.wastegate.updatePartAndTriggerParent(this.turbo.rigidPart.transform);
+                    this.turbo.downPipe.updatePartAndTriggerParent(this.rigidPart.transform);
+                }
             }
             base.assemble(inStartup);
         }
@@ -57,8 +62,13 @@ namespace TommoJProductions.TurboMod.Parts
             if (!inStartup)
             {
                 this.turbo.updatePartAndTriggerParent(this.activePart.transform, this.turbo.installedPos, this.turbo.installedRot);
-                this.turbo.airFilter.updatePartAndTriggerParent(this.turbo.rigidPart.transform);
-                this.turbo.wastegate.updatePartAndTriggerParent(this.turbo.rigidPart.transform);
+                if (this.turbo.installed)
+                {
+                    this.turbo.airFilter.updatePartAndTriggerParent(this.turbo.rigidPart.transform);
+                    this.turbo.highFlowAirFilter.updatePartAndTriggerParent(this.turbo.rigidPart.transform);
+                    this.turbo.wastegate.updatePartAndTriggerParent(this.turbo.rigidPart.transform);
+                    this.turbo.downPipe.updatePartAndTriggerParent(this.rigidPart.transform);
+                }
             }
             base.disassemble(inStartup);
         }

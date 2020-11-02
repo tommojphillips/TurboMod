@@ -28,13 +28,18 @@ namespace TommoJProductions.TurboMod.Parts
             set;
         }
 
+        internal WastegateAdjustMono wastegateAdjust { get; private set; }
+
         #endregion
 
         #region Constructors
 
         public WastegateActuatorPart(PartSaveInfo inPartSaveInfo, GameObject inPart, GameObject inParent, Trigger inPartTrigger, Vector3 inPartPosition, Quaternion inPartRotation) : base(inPartSaveInfo, inPart, inParent, inPartTrigger, inPartPosition, inPartRotation)
         {
-        }
+            // Written, 28.10.2020
+
+            this.wastegateAdjust = this.rigidPart.AddComponent<WastegateAdjustMono>();
+       }
 
         #endregion
 

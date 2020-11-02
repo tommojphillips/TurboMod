@@ -1,9 +1,4 @@
 ﻿using ModApi;
-using ModApi.Attachable;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using UnityEngine;
 
 namespace TommoJProductions.TurboMod
@@ -22,7 +17,7 @@ namespace TommoJProductions.TurboMod
             // setting up turbo blades
             this.turboBlades = this.gameObject.transform.FindChild("motor_turbocharger_blades").gameObject;
             SphereCollider sc = this.turboBlades.AddComponent<SphereCollider>();
-            sc.radius = 0.025f;
+            sc.radius = 0.015f;
             sc.isTrigger = true;
         }
         void Update()
@@ -44,7 +39,7 @@ namespace TommoJProductions.TurboMod
             else if (this.previousTurboBladesHit)
             {
                 this.previousTurboBladesHit = false;
-                ModClient.guiInteract();
+                ModClient.guiInteract(inGuiInteractSymbol: GuiInteractSymbolEnum.None);
             }
         }
 
@@ -55,6 +50,7 @@ namespace TommoJProductions.TurboMod
 
             this.turboBlades.transform.localEulerAngles += new Vector3(10, 0f, 0f);
             ModClient.guiInteract("Looks alright");
+            MasterAudio.PlaySound3DAndForget("Motor", this.transform, false, 1, null, 0f, "valve_knock");
         }
     }
 }

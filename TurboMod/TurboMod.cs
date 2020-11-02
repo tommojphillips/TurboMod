@@ -52,7 +52,7 @@ namespace TommoJProductions.TurboMod
         /// <summary>
         /// Represents the turbo mod assets.
         /// </summary>
-        private TurboModAssets modAssets;
+        internal TurboModAssets modAssets;
 
         #endregion
 
@@ -107,6 +107,8 @@ namespace TommoJProductions.TurboMod
             {
                 AssetBundle ab = LoadAssets.LoadBundle(this, "dazyturbo.unity3d");
                 this.modAssets = new TurboModAssets(ab.LoadAsset("TURBOPARTS.prefab") as GameObject);
+                this.modAssets.turboGlowMat = Resources.Load<Material>("Mods/Assets/TurboMod/StandardSpecular.mat");
+                print("turbo Glowing loaded: {0}", this.modAssets.turboGlowMat ?? null);
                 assetsLoaded = true;
                 ab.Unload(false);
                 print("Asset bundle loaded and unloaded successfully.");
@@ -142,7 +144,7 @@ namespace TommoJProductions.TurboMod
             // Oil Cooler
             Vector3 oilCoolerTriggerPos = new Vector3(-0.00385f, -0.1566f, 1.58f);
             Trigger oilCoolerTrigger = new Trigger("oilCoolerTrigger", satsuma, oilCoolerTriggerPos, rotZero, scale, true) { triggerPosition = oilCoolerTriggerPos, triggerRotation = rotZero };
-            this.turboParts.oilCoolerPart = new OilCoolerPart(null, this.modAssets.oilLines, satsuma, oilCoolerTrigger, oilCoolerTriggerPos, rotZero);
+            this.turboParts.oilCoolerPart = new OilCoolerPart(null, this.modAssets.oilCooler, satsuma, oilCoolerTrigger, oilCoolerTriggerPos, rotZero);
             // Carb Pipe
             Vector3 carbPipeTriggerPos = new Vector3(0.0605f, -0.063f, 0.038f);
             Quaternion carbPipeTriggerRot = Quaternion.Euler(270, 180, 0);
@@ -160,17 +162,30 @@ namespace TommoJProductions.TurboMod
             // Air filter
             Vector3 airFilterTriggerPos = new Vector3(-0.11f, 0, 0);
             Quaternion airFilterTriggerRot = Quaternion.Euler(-90f, 0, 0);
-            Trigger airFilterTrigger = new Trigger("airFilterTrigger", this.turboParts.turboPart.activePart, airFilterTriggerPos, airFilterTriggerRot, scale, true) { triggerPosition = airFilterTriggerPos, triggerRotation = airFilterTriggerRot};
+            Trigger airFilterTrigger = new Trigger("airFilterTrigger", this.turboParts.turboPart.activePart, airFilterTriggerPos, airFilterTriggerRot, scale, true) { triggerPosition = airFilterTriggerPos, triggerRotation = airFilterTriggerRot };
             this.turboParts.airFilterPart = new AirFilterPart(null, this.modAssets.airFilter, this.turboParts.turboPart.activePart, airFilterTrigger, airFilterTriggerPos, airFilterTriggerRot);
+            // High Flow Air filter
+            Quaternion highFlowAirFilterRot = Quaternion.Euler(90, 0, 0);
+            this.turboParts.highFlowAirFilterPart = new HighFlowAirFilterPart(null, this.modAssets.highFlowAirFilter, this.turboParts.turboPart.activePart, airFilterTrigger, airFilterTriggerPos, highFlowAirFilterRot);
             // Wastegate
             Vector3 wastgateTriggerPos = new Vector3(-0.054f, 0.023f, 0.0557f);
             Trigger wastegateTrigger = new Trigger("wastegateTrigger", this.turboParts.turboPart.activePart, wastgateTriggerPos, rotZero, scale, true) { triggerPosition = wastgateTriggerPos, triggerRotation = rotZero };
             this.turboParts.wastegateActuatorPart = new WastegateActuatorPart(null, this.modAssets.wastegateActuator, this.turboParts.turboPart.activePart, wastegateTrigger, wastgateTriggerPos, rotZero);
+            Vector3 downPipeTriggerPos = new Vector3(0.19f, 0, 0.2f);
+            Quaternion downPipeTriggerRot = Quaternion.Euler(0, 0, 0);
+            Trigger downPipeTrigger = new Trigger("downPipeTrigger", this.turboParts.turboPart.activePart, downPipeTriggerPos, downPipeTriggerRot, scale, true) { triggerPosition = downPipeTriggerPos, triggerRotation = downPipeTriggerRot };
+            this.turboParts.downPipePart = new DownPipePart(null, this.modAssets.downPipe_race, this.turboParts.turboPart.activePart, downPipeTrigger, downPipeTriggerPos, downPipeTriggerRot);
             /*boostGaugePart = new BoostGaugePart(null, this.modAssets.boostGauge, parent, trigger, Vector3.zero, new Quaternion()),
-                intercoolerPart = new IntercoolerPart(null, this.modAssets.intercooler, parent, trigger, Vector3.zero, new Quaternion()),
-                oilCoolerPart = new OilCoolerPart(null, this.modAssets.oilCooler, parent, trigger, Vector3.zero, new Quaternion()),
-                oilLinesPart = new OilLinesPart(null, this.modAssets.oilLines, parent, trigger, Vector3.zero, new Quaternion()),*/
+                intercoolerPart = new IntercoolerPart(null, this.modAssets.intercooler, parent, trigger, Vector3.zero, new Quaternion()),*/
             print("Initialized turbo parts");
+        }
+        private void moveObjectGuiTool() 
+        {
+            // Written, 31.10.2020
+
+            GUI.Label(new Rect(Screen.width - 520, Screen.height - 520, 500, 500), String.Format("INSPECTING:{0}\nPOS: X:{1} Y:{2} Z:{3}\nROT:X:{4} Y:{5}:Z{6}",
+                this.inspectingPart.name, this.inspectingPart.transform.localPosition.x, this.inspectingPart.transform.localPosition.y, this.inspectingPart.transform.localPosition.z,
+                this.inspectingPart.transform.localRotation.eulerAngles.x, this.inspectingPart.transform.localRotation.eulerAngles.y, this.inspectingPart.transform.localRotation.eulerAngles.z));
         }
 
         #endregion
@@ -199,7 +214,8 @@ namespace TommoJProductions.TurboMod
                 }//move part
             if (inspectingPart != null)
             {
-                float increase = 0.01f;
+                this.moveObjectGuiTool();
+                float increase = 0.001f;
                 Vector3 moveVector = Vector3.zero;
 
                 if (up.GetKeybindDown())
@@ -215,7 +231,7 @@ namespace TommoJProductions.TurboMod
                 else if (tiltRight.GetKeybindDown())
                     moveVector = new Vector3(0, 0, -increase);
                 if (rotation.GetKeybind())
-                    inspectingPart.transform.RotateAround(inspectingPart.transform.parent.position, inspectingPart.transform.parent.up, 1 * Time.deltaTime);// = Quaternion.LookRotation(moveVector, Vector3.forward);//.localRotation.SetFromToRotation( = Quaternion.Euler(moveVector + inspectingPart.transform.localRotation.eulerAngles);
+                    inspectingPart.transform.Rotate(moveVector, increase);// = Quaternion.LookRotation(moveVector, Vector3.forward);//.localRotation.SetFromToRotation( = Quaternion.Euler(moveVector + inspectingPart.transform.localRotation.eulerAngles);
                 else
                     inspectingPart.transform.localPosition += moveVector;
                 if (printKb.GetKeybindDown())

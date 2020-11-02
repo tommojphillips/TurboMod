@@ -21,6 +21,7 @@ namespace TommoJProductions.TurboMod
         internal GameObject chargePipeHotSide_race;
         internal GameObject chargePipeColdSide_race;
         internal GameObject downPipe_race;
+        internal Material turboGlowMat;
         internal TurboModAssets(GameObject inPrefab) 
         {
             // Written, 27.10.2020

@@ -28,12 +28,18 @@ namespace TommoJProductions.TurboMod.Parts
             set;
         }
 
+        internal GameObject oilCoolerLines { get; private set; }
+
         #endregion
 
         #region Constructors
 
         public OilCoolerPart(PartSaveInfo inPartSaveInfo, GameObject inPart, GameObject inParent, Trigger inPartTrigger, Vector3 inPartPosition, Quaternion inPartRotation) : base(inPartSaveInfo, inPart, inParent, inPartTrigger, inPartPosition, inPartRotation)
         {
+            // Written, 28.10.2020
+
+            /*this.oilCoolerLines = this.rigidPart.transform.FindChild("Lines").gameObject;
+            this.oilCoolerLines.SetActive(true);*/
         }
 
         #endregion
@@ -42,6 +48,7 @@ namespace TommoJProductions.TurboMod.Parts
 
         protected override void assemble(bool inStartup = false)
         {
+            this.setActiveRecursively(true, false);
             base.assemble(inStartup);
         }
 
