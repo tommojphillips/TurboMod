@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using MSCLoader;
+using UnityEngine;
 
 namespace TommoJProductions.TurboMod
 {
@@ -21,17 +22,13 @@ namespace TommoJProductions.TurboMod
         internal GameObject chargePipeHotSide_race;
         internal GameObject chargePipeColdSide_race;
         internal GameObject downPipe_race;
+
         internal Material turboGlowMat;
+
         internal TurboModAssets(GameObject inPrefab) 
         {
             // Written, 27.10.2020
 
-            /*for (int i = 1; i < inPrefab.transform.childCount; i++)
-            {
-                GameObject child = inPrefab.transform.GetChild(i).gameObject;
-                //child.AddComponent<Rigidbody>();
-                child.AddComponent<BoxCollider>();
-            }*/
             this.turboPartsPrefab = inPrefab;
             this.oilLines = inPrefab.transform.GetChild(1).gameObject;
             TurboMod.print("{0}: found", this.oilLines.name);

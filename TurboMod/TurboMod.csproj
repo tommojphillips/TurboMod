@@ -85,6 +85,7 @@
     <Compile Include="Parts\TurboPart.cs" />
     <Compile Include="Parts\TurboParts.cs" />
     <Compile Include="Parts\WastegateActuatorPart.cs" />
+    <Compile Include="TurboModSaveData.cs" />
     <Compile Include="TurboSimulation.cs" />
     <Compile Include="WastegateAdjustMono.cs" />
     <Compile Include="TurboModAssets.cs" />

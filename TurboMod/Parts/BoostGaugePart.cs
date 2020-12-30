@@ -28,12 +28,16 @@ namespace TommoJProductions.TurboMod.Parts
             set;
         }
 
+        internal GameObject gaugeNeedle { get; private set; }
         #endregion
 
         #region Constructors
 
         public BoostGaugePart(PartSaveInfo inPartSaveInfo, GameObject inPart, GameObject inParent, Trigger inPartTrigger, Vector3 inPartPosition, Quaternion inPartRotation) : base(inPartSaveInfo, inPart, inParent, inPartTrigger, inPartPosition, inPartRotation)
         {
+            // Written, 03.11.2020
+
+            this.gaugeNeedle = this.rigidPart.transform.GetChild(2).gameObject;
         }
 
         #endregion

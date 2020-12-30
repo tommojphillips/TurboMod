@@ -1,4 +1,5 @@
 ﻿using ModApi.Attachable;
+using MSCLoader;
 using UnityEngine;
 
 namespace TommoJProductions.TurboMod.Parts
@@ -9,7 +10,7 @@ namespace TommoJProductions.TurboMod.Parts
 
         #region Properties
 
-        public override PartSaveInfo defaultPartSaveInfo => new PartSaveInfo() 
+        public override PartSaveInfo defaultPartSaveInfo => new PartSaveInfo()
         {
             installed = false,
             position = new Vector3(1560.55f, 5, 730),
@@ -31,10 +32,15 @@ namespace TommoJProductions.TurboMod.Parts
         internal Vector3 installedPos { get; private set; }
         internal Quaternion installedRot { get; private set; }
 
+        internal AudioSource turboBackfire { get; private set; }
+        internal ModAudio turboBackfireModAudio { get; private set; }
         internal WastegateActuatorPart wastegate { get { return TurboMod.instance.turboParts.wastegateActuatorPart; } }
         internal AirFilterPart airFilter { get { return TurboMod.instance.turboParts.airFilterPart; } }
         internal HighFlowAirFilterPart highFlowAirFilter { get { return TurboMod.instance.turboParts.highFlowAirFilterPart; } }
         internal DownPipePart downPipe { get { return TurboMod.instance.turboParts.downPipePart; } }
+
+        internal Vector3 turboExhaustParticlesPos = new Vector3(0.0706f, 0, 0);
+        internal Quaternion turboExhaustParticlesRot = Quaternion.Euler(Vector3.zero);
 
         #endregion
 
@@ -47,10 +53,6 @@ namespace TommoJProductions.TurboMod.Parts
             // destorying new looking turbo mesh from parts
             Object.DestroyImmediate(this.activePart.transform.FindChild("turbomesh").gameObject);
             Object.DestroyImmediate(this.rigidPart.transform.FindChild("turbomesh").gameObject);
-            // destorying unused children
-            /*Object.DestroyImmediate(this.rigidPart.transform.FindChild("stickuator").gameObject);
-            Object.DestroyImmediate(this.rigidPart.transform.FindChild("racehatpivot_hot").gameObject);
-            Object.DestroyImmediate(this.activePart.transform.FindChild("racehatpivot_hot").gameObject);*/
             // Destorying audio source from parts.
             Object.DestroyImmediate(this.rigidPart.transform.FindChild("handgrind").gameObject);
             Object.DestroyImmediate(this.activePart.transform.FindChild("flutter").gameObject);
@@ -62,17 +64,32 @@ namespace TommoJProductions.TurboMod.Parts
             //Assigning active installed pos and rot
             this.installedPos = inPartPosition;
             this.installedRot = inPartRotation;
+            // Audio
+            this.initializeAudio();
         }
 
         #endregion
 
         #region Methods
+        private void initializeAudio()
+        {
+            // Written, 03.11.2020
 
+            this.turboBackfire = this.rigidPart.AddComponent<AudioSource>();
+            this.turboBackfireModAudio = new ModAudio();
+            this.turboBackfireModAudio.audioSource = this.turboBackfire;
+            this.turboBackfireModAudio.LoadAudioFromFile(System.IO.Path.Combine(ModLoader.GetModAssetsFolder(TurboMod.instance), "backFire_once.wav"), true, false);
+            this.turboBackfire.minDistance = 1f;
+            this.turboBackfire.maxDistance = 10f;
+            this.turboBackfire.spatialBlend = 1f;
+            this.turboBackfire.volume = 1;
+            //this.turboBackfire.pitch = 1.33f;
+        }
         protected override void assemble(bool inStartup = false)
         {
             // Written, 28.10.2020
 
-
+            TurboSimulation.checkExhaust = true;
             this.setActiveRecursively(false);
             this.setActiveRecursively(true, false);
             if (!inStartup)
@@ -87,6 +104,9 @@ namespace TommoJProductions.TurboMod.Parts
 
         protected override void disassemble(bool inStartup = false)
         {
+            // Written, 04.11.2020
+
+            TurboSimulation.checkExhaust = true;
             this.setActiveRecursively(true);
             this.setActiveRecursively(false, false);
             if (!inStartup)
