@@ -1,5 +1,4 @@
-﻿using MSCLoader;
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace TommoJProductions.TurboMod
 {
