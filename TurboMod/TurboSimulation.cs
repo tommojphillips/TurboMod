@@ -209,6 +209,10 @@ namespace TommoJProductions.TurboMod
 			// Boost gauge needle
 			boostGauge.onAssemble += boostGaugeNeedleReset;
 			boostGauge.onDisassemble += boostGaugeNeedleReset;
+
+			// oil cooler pipes
+			oilCooler.onAssemble += oilCoolOnAssemble;
+			oilCooler.onDisassemble += oilCoolOnDisassemble;
 		}
         private void OnDisable()
 		{
@@ -232,6 +236,10 @@ namespace TommoJProductions.TurboMod
 			// Boost gauge needle
 			boostGauge.onAssemble -= boostGaugeNeedleReset;
 			boostGauge.onDisassemble -= boostGaugeNeedleReset;
+
+			// oil cooler pipes
+			oilCooler.onAssemble -= oilCoolerOnAssemble;
+			oilCooler.onDisassemble -= oilCoolerOnDisassemble;
 
 		}
 		private void Awake()
@@ -856,7 +864,14 @@ namespace TommoJProductions.TurboMod
 		#endregion
 
 		#region EventHandlers
-
+		private void oilCoolerOnAssemble() 
+		{
+			oilCooler.transform.GetChild(0).gameObject.SetActive(true);
+		}
+		private void oilCoolerOnDisassemble()
+		{
+			oilCooler.transform.GetChild(0).gameObject.SetActive(false);
+		}
 		private void updateCarbSetup() 
 		{
 			if (raceCarbinstall)
