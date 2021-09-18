@@ -2,760 +2,902 @@
 using HutongGames.PlayMaker.Actions;
 using MSCLoader;
 using System;
-using System.Collections.Generic;
+using System.Collections;
 using System.Linq;
-using System.Text;
-using System.Threading;
-using TommoJProductions.TurboMod.Parts;
 using UnityEngine;
+using Random = UnityEngine.Random;
+using TommoJProductions.ModApi.v0_1_3_0_alpha.Attachable;
 
 namespace TommoJProductions.TurboMod
 {
-    internal class TurboSimulation : MonoBehaviour
+	public class TurboSimulation : MonoBehaviour
     {
-		// Written, 28.10.2020
+        #region Class Structs
 
-		private GameObject turboBlades;
-		private int rpmAtMaxBoost = 7500;
-		private int initialRpm = 1600;
-		private float turboCoolerModifier = 0.007f;
-		private bool orginalExhaustSet = true;
-		internal TurboParts turboParts { get { return TurboMod.instance.turboParts; } }
-		internal bool throttleUsed { get { return this.drivetrain.idlethrottle > 0; } }
-		internal bool throttleButtonUsed { get { return cInput.GetKey("Throttle"); } }
-		internal bool anyThrottleUsed { get { return this.throttleButtonUsed || this.throttleUsed; } }
-		internal float turboSpoolDelayTime { get; private set; }
-		internal float turboSpoolDelayModifier { get; private set; }
-		internal float turboRpm { get; private set; }
-		internal bool canBlowOff { get; private set; }
-		internal float airFuelRatioModifier { get; private set; }
-		internal float whistlePitchModifier { get; private set; } = 0.00018f;
-		internal float flutterPitch { get; private set; } = 1.33f;
-		internal float calculatedBoost { get; private set; }
-		internal float wastegatePsi { get; private set; }
-		internal float turboDelayModifier { get; private set; } = 0.55f;
-		internal float appliedPowerMultiplier { get; private set; }
-		internal float boostMultiplier { get; private set; } = 0.00013f;
-		internal static bool checkExhaust { get; set; }
+        public struct turboSimulationSaveData 
+		{
+			internal bool turboDestroyed;
+			internal float turboWear;
+			internal float wastegatePsi;
+		}
 
-		#region Data fields
+		#endregion
 
-		private FsmFloat fuelPumpEfficiency;
-        private FsmFloat engineTemp;
-        private FsmFloat fuel;
-        private FsmFloat coolingAirRateMultiplier;
-		private FsmFloat playerStressLevel;
-		private FsmFloat airFuelMixture;
-		private FsmFloat airDensity;
-		private FsmString currentVehicle;
-        //gameobjects
-        private GameObject satuma;
-		private Drivetrain drivetrain;
-        private GameObject carSimulation;
+		#region Constraints
+
+		/// <summary>
+		/// represents turbo rpm to psi constant. eg. rpm => {PSI} * {RPM2PSI} | psi => {rpm} / {RPM2PSI} 
+		/// </summary>
+		public const int RPM2PSI = 11300;
+		/// <summary>
+		/// Represents the min wastegate rpm.
+		/// </summary>
+		public const int MIN_WASTEGATE_RPM = 52175;
+		/// <summary>
+		/// Represents the max wastegate rpm.
+		/// </summary>
+		public const int MAX_WASTEGATE_RPM = 203400;
+		/// <summary>
+		/// Represents the wastegate adjust interval.
+		/// </summary>
+		public const int WASTEGATE_ADJUST_INTERVAL = 2825;
+
+		#endregion
+
+		#region Fields
+
+		// Static fields
+		public static FsmString Interacttext;
+		public static Part turbo;
+		public static Part headers;
+		public static Part downPipe;
+		public static Part filter;
+		public static Part highFlowFilter;
+		public static Part carbPipe;
+		public static Part coldSidePipe;
+		public static Part hotSidePipe;
+		public static Part intercooler;
+		public static Part oilCooler;
+		public static Part oilLines;
+		public static Part act;
+		public static Part boostGauge;
+
+
+		// Private fields
+		private AudioSource turboWhistle;
+		private AudioSource turboFlutter;
+		private Drivetrain drivetrain = null;
+		private bool GUIdebug = false;
+		private float afrFactor;
+		private float BLOWCHANCE;
+		private float timeBoost;
+		private float turbospin;
+		private float throtsmooth;
+		private float wgspool;
+		private float vacsmooth;
+		private FsmFloat engineTemp;
+		private FsmFloat THROTPEDAL;
+		private FsmFloat AIRDENSE;
+		private FsmFloat STRESS = PlayMakerGlobals.Instance.Variables.FindFsmFloat("PlayerStress");
+		private FsmFloat SPEEDKMH = PlayMakerGlobals.Instance.Variables.FindFsmFloat("SpeedKMH");
+		private FsmState calculateMixtureState;
+		private GameObject turbofan;
+		private GameObject n2otrigger;
+		private GameObject stockfiltertrigger;
+		private GameObject soundSpool;
+		private GameObject turboneedleobject;
+		private GameObject TURBOMESH;
+		private GameObject TURBOMESH_D;
 		private GameObject engine;
-		private GameObject engineFuel;
-		private GameObject exhaust;
-		private GameObject fromMuffler;
-		private Vector3 fromMufflerOrginalPos;
-		private Quaternion fromMufflerOrginalRot;
-		private GameObject fromEngine;
-		private Vector3 fromEngineOrginalPos;
-		private Quaternion fromEngineOrginalRot;
-		private GameObject fromPipe;
-		private Vector3 fromPipeOrginalPos;
-		private Quaternion fromPipeOrginalRot;
-		private GameObject fromHeaders;
-		private Vector3 fromHeadersOrginalPos;
-		private Quaternion fromHeadersOrginalRot;
-		//Playmaker
-		private PlayMakerFSM carCoolingFSM;
-		private PlayMakerFSM backfireEvent;
-		private PlayMakerFSM fuelEventFSM;
-		private PlayMakerFSM fuelFSM;
-		// Audio
-		private AudioSource whistleSound;
-		private AudioSource flutterSound;
+		private GameObject FIRE;
+		private GameObject soundFlutter;
+		private GameObject PINGING;
+		private GameObject headertriggers;
+		private GameObject exhaust_fromEngine;
+		private GameObject exhaust_fromMuffler;
+		private GameObject exhaust_fromPipe;
+		private GameObject exhaust_fromHeaders;
+		private GUIStyle guiStyle = new GUIStyle();
 
-        #endregion
+		// Internal fields
+		internal PlayMakerFSM SWEAR;
+		internal PlayMakerFSM MOTORBLOW;
+		internal PlayMakerFSM HEADGASKET;
+		internal PlayMakerFSM BACKFIRE;
+		internal PlayMakerFSM FUEL;
+		internal PlayMakerFSM FUELevent;
+		internal PlayMakerFSM OIL;
+		internal PlayMakerFSM WEAR;
+		internal float wastegateRPM = 115000f;
+		internal float maxboostfuel;
+		internal float turboNeedleBoost;
+		internal float wastegatePSI;
+		internal float PSI;
 
-        #region Unity Runtime Methods
+		//Public fields
+		public bool carbinstall;
+		public bool isPiped;
+		public bool isFiltered;
+		public bool isExhaust;
+		public bool raceCarbinstall;
+		public bool turboDestroyed;
+		public bool wear = false;
+		public FsmBool headersinstalled;
+		public FsmBool n2oinstalled;
+		public FsmBool racecarbinstalled;
+		public FsmBool raceexhaustinstalled;
+		public FsmBool raceheadersinstalled;
+		public FsmBool racemufflerinstalled;
+		public FsmBool stockcarbinstalled;
+		public FsmBool stockfilterinstalled;
+		public FsmBool GUIuse = PlayMakerGlobals.Instance.Variables.FindFsmBool("GUIuse");
+		public FsmFloat AFR;
+		public FsmFloat CarbBowl;
+		public FsmFloat Fuelpumpefficiency;
+		public FsmFloat HEADGASKETwear;
+		public FsmFloat OilLevel;
+		public FsmFloat OilDirt;
+		public FsmFloat PISTON1wear;
+		public FsmFloat PISTON2wear;
+		public FsmFloat PISTON3wear;
+		public FsmFloat PISTON4wear;
+		public float coolMult;
+		public float adjustTime;
+		public float maxsafeTorque;
+		public float motorStress;
+		public float turboFriction;
+		public float turboSpool;
+		public float turbowearrate;
+		public float rpmAtMaxBoost;
+		public float vacthrot;
+		public float wearMult;
+		public float boostMultiplier = 0.00013f;
+		public float bovtimesince = 0f;
+		public float boostneedle = 20f;
+		public float frictionmult = 115f;
+		public float initialRpm = 2500f;
+		public float turboTargetRPM = 180001f;
+		public float turboRPM = 0f;
+		public float oilCoolerCoolingRate = 0.007392f;
+		public float oilCoolerThermostatRating = 95;
+		public GameObject DEATH;
+		public static GameObject PLAYER;
+		internal int sizef;
+		internal int widthlol;
+		internal int heightlol;
+		internal float PSIRART;
 
-        void Start() 
-        {
-			// Written, 28.10.2020
+		internal turboSimulationSaveData loadedSaveData;
+		internal turboSimulationSaveData defaultSaveData => new turboSimulationSaveData() { turboDestroyed = false, turboWear = Random.Range(75, 100) + (Random.Range(0, 100) * 0.001f), wastegatePsi = 8.25f };
 
-			this.turboBlades = this.gameObject.transform.FindChild("motor_turbocharger_blades").gameObject;
-			this.setValues(); 
-			this.turboParts.wastegateActuatorPart.wastegateAdjust.turboSimulation = this;
-			if (this.turboParts.wastegateActuatorPart.wastegateAdjust.wastegatePsiToAdd != default)
+		private Coroutine oilCoolerRoutine;
+		private Coroutine turboRoutine;
+		private Coroutine pipeRoutine;
+
+		#endregion
+
+		#region Properties
+
+		public bool engineOn => engine.activeInHierarchy;
+		public bool canTurboWork => turbo.installed && headers.installed && !turboDestroyed && engineOn;
+		public bool canOilCoolerWork => oilCooler.installed && engineOn;
+		public bool canPipeWork => canTurboWork && isPiped;
+		
+		#endregion
+
+		#region Unity runtime methods.
+
+		private void OnEnable()
+		{
+			// filter boost multipier check
+			filter.onAssemble += updateBoostMultiplier;
+			filter.onDisassemble += updateBoostMultiplier;
+			highFlowFilter.onAssemble += updateBoostMultiplier;
+			highFlowFilter.onDisassemble += updateBoostMultiplier;
+
+			// carb install check
+			carbPipe.onAssemble += updateStockCarbInstall;
+			carbPipe.onDisassemble += updateStockCarbInstall;
+			// race carb install check
+			coldSidePipe.onAssemble += updateRaceCarbInstall;
+			coldSidePipe.onDisassemble += updateRaceCarbInstall;
+			hotSidePipe.onAssemble += updateRaceCarbInstall;
+			hotSidePipe.onDisassemble += updateRaceCarbInstall;
+			intercooler.onDisassemble += updateRaceCarbInstall;
+			intercooler.onAssemble += updateRaceCarbInstall;
+
+			// Boost gauge needle
+			boostGauge.onAssemble += boostGaugeNeedleReset;
+			boostGauge.onDisassemble += boostGaugeNeedleReset;
+		}
+        private void OnDisable()
+		{
+			// filter boost multipier check
+			filter.onAssemble -= updateBoostMultiplier;
+			filter.onDisassemble -= updateBoostMultiplier;
+			highFlowFilter.onAssemble -= updateBoostMultiplier;
+			highFlowFilter.onDisassemble -= updateBoostMultiplier;
+
+			// carb install check
+			carbPipe.onAssemble -= updateStockCarbInstall;
+			carbPipe.onDisassemble -= updateStockCarbInstall;
+			// race carb install check
+			coldSidePipe.onAssemble -= updateRaceCarbInstall;
+			coldSidePipe.onDisassemble -= updateRaceCarbInstall;
+			hotSidePipe.onAssemble -= updateRaceCarbInstall;
+			hotSidePipe.onDisassemble -= updateRaceCarbInstall;
+			intercooler.onDisassemble -= updateRaceCarbInstall;
+			intercooler.onAssemble -= updateRaceCarbInstall;
+
+			// Boost gauge needle
+			boostGauge.onAssemble -= boostGaugeNeedleReset;
+			boostGauge.onDisassemble -= boostGaugeNeedleReset;
+
+		}
+		private void Awake()
+		{
+			initSimulation();
+			initEngineState();
+		}
+		private void Update()
+		{
+			checkRoutinesRunning();
+		}
+		private void LateUpdate()
+		{
+			if (cInput.GetButton("DrivingMode") && cInput.GetButton("Finger") && adjustTime >= 4)
 			{
-				this.addWastegatePsi(this.turboParts.wastegateActuatorPart.wastegateAdjust.wastegatePsiToAdd);
-				this.turboParts.wastegateActuatorPart.wastegateAdjust.wastegatePsiToAdd = default;
+				GUIdebug = !GUIdebug;
+				if (!GUIdebug)
+				{
+					Interacttext.Value = "Turbo Debug UI: ENABLED";
+					adjustTime = 0f;
+					ModConsole.Log("[turbomod]: Debug GUI: Enabled");
+				}
+				else
+				{
+					Interacttext.Value = "Turbo Debug UI: DISABLED";
+					adjustTime = 0f;
+					ModConsole.Log("[turbomod]: Debug GUI: Disabled");
+				}
 			}
-
-		}
-		void Update() 
-		{
-			// Written, 02.11.2020
-
-			this.debugKeys();
-
-			this.turboSimulation();
-		}
-		void LateUpdate() 
-        {
-			// Written, 02.11.2020
-
-			this.turboSimulationLate();
-        }
-		void OnGUI() 
-		{
-			// Written, 30.10.2020
-
-			if (this.debugGuiKey.GetKeybindDown())
-				this.showDebugGUI = !this.showDebugGUI;
-			if (this.showDebugGUI)
+			if (adjustTime != 4)
 			{
-				string text = string.Empty;
-				try
-				{
-					string turboStatus = string.Empty;
-					if (this.turboParts.isCorePartsInstalled())
-						turboStatus = "+ Core parts installed: ";
-					else
-						turboStatus = "+ Core parts not installed:\n";
-					float _calculatedBoost = this.calculateMaxBoost();
-					turboStatus += _calculatedBoost + " psi\nDelayed:(" + this.calculatedBoost + ") psi";
-					turboStatus += "\n differance: " + (Mathf.Abs(_calculatedBoost - this.calculatedBoost));
-					if (this.turboParts.carbPipePart.installed)
-						turboStatus += "\n+ Carburator pipe installed";
-					else
-						turboStatus += "\n+ Carburator pipe not installed";
-					if (this.turboParts.oilCoolerPart.installed)
-						turboStatus += "\n+ Oil cooler installed";
-					else
-						turboStatus += "\n+ Oil cooler not installed";
-					if (this.turboParts.wastegateActuatorPart.installed)
-						turboStatus += "\n+ Wastegate installed";
-					else
-						turboStatus += "\n+ Wastegate not installed";
-					turboStatus += " (" + this.wastegatePsi + "psi)";
-					if (this.turboParts.airFilterPart.installed)
-						turboStatus += "\n+ Air filter installed";
-					else if (this.turboParts.highFlowAirFilterPart.installed)
-						turboStatus += "\n+ High flow air filter installed";
-					else
-						turboStatus += "\n+ No air filter installed";
-					turboStatus += "()";
-					turboStatus += "\nWhistle pitch modifier (rpm*modifier): " + this.whistlePitchModifier;
-					turboStatus += "\nFlutter pitch absolute: " + this.flutterPitch;
-					turboStatus += "\nTurbo lag: " + this.turboDelayModifier;
-					turboStatus += "\nTurbo spool delay modifier: " + this.turboSpoolDelayModifier;
-					turboStatus += "\nTurbo spool delay time: " + this.turboSpoolDelayTime;
-					turboStatus += "\nEditing Choice: " + this.adjustWhat;
-					turboStatus += "\npotential power modifier: " + this.appliedPowerMultiplier;
-					if (this.turboParts.isCorePartsInstalled() && this.turboParts.carbPipePart.installed)
-						turboStatus += " (";
-					else
-						turboStatus += " (NOT";
-					turboStatus += " APPLIED)";
-					string satsumaStats = string.Format("HP: {0}\nPower modifier: {1}\nTorque: {2}\nEngine temp: {3}\nThrottle: {4}\nIdle Throttle: {5}\nClutch max torque: {6}\nClutch torque modifier: {7}" +
-						"\nAF Mixture: {8}\nAir density: {9}\nAF Modifier: {10}",
-						Math.Round(this.drivetrain.currentPower, 2), Math.Round(this.drivetrain.powerMultiplier, 2),
-						Math.Round(this.drivetrain.torque, 2), Math.Round(this.engineTemp.Value, 2), this.drivetrain.throttle, this.drivetrain.idlethrottle,
-						this.drivetrain.clutchMaxTorque, this.drivetrain.clutchTorqueMultiplier, this.airFuelMixture.Value, this.airDensity.Value, this.airFuelRatioModifier);
-					text = string.Format(
-						"------------------------------------------------------------" +
-						"\nTurbo Stats:\n" + turboStatus + "\n------------------------------------------------------------" +
-						"\nSatsuma Stats:\n" + satsumaStats + "\n------------------------------------------------------------");
-				}
-				catch (Exception ex)
-				{
-					text = "ERROR {0}";
-					TurboMod.print(text , ex.StackTrace);
-				}
-				finally 
-				{
-					GUI.Label(new Rect(20, 20, 500, 500), text);
-				}
+				adjustTime += 0.125f;
 			}
+			if (isPlayerLookingAt(turbofan.gameObject))
+			{
+				turboCondCheck();
+			}
+			if (isPlayerLookingAt(act.gameObject))
+			{
+				wasteGateAdjust();
+			}
+			partCheck();
+
+			// boost gauge needle rotation update
+			if (turboneedleobject.transform.localEulerAngles.z != boostneedle)
+				turboneedleobject.transform.localEulerAngles = new Vector3(0f, 0f, boostneedle);
 		}
 
-        #endregion
+        #region OnGUI & GUI Fields
 
-        #region Debug methods
+        private string whistleModifierString = "";
+		private string flutterModifierString = "";
+		private float whistleModifier = 1.1f;
+		private float flutterModifier = 1.3563f;
 
-        private bool showDebugGUI = true;
-		private int adjustWhat = 0;
-		private int numOfChoices = 3;//flutter pitch (0), whistle pitch (1), turbo delay (2)
-		private Keybind debugGuiKey = new Keybind("turbo_debugGui", "turbo mod gui", KeyCode.KeypadEnter);
-		private Keybind modifierKey = new Keybind("turbo_modifier", "turbo mod modifier", KeyCode.LeftControl);
-		private Keybind increaseKey = new Keybind("turbo_increase", "turbo mod increase", KeyCode.KeypadPlus);
-		private Keybind decreaseKey = new Keybind("turbo_decrease", "turbo mod decrease, ", KeyCode.KeypadMinus);
-		private void debugKeys()
+		private void OnGUI()
 		{
-			// Written, 31.10.2020
-
-			if (this.debugGuiKey.GetKeybindDown())
-				this.showDebugGUI = !this.showDebugGUI;
-			if (this.showDebugGUI)
+			sizef = Screen.width / 110;
+			widthlol = 1800;
+			heightlol = 650;
+			bool guidebug = GUIdebug;
+			if (guidebug)
 			{
-				if (this.modifierKey.GetKeybindDown())
-					if (adjustWhat < numOfChoices)
-						adjustWhat++;
-					else if (adjustWhat > 0)
-						adjustWhat--;
-				float increaseBy = 0;
-				if (this.increaseKey.GetKeybind())
-					increaseBy = 0.0001f;
-				else if (this.decreaseKey.GetKeybind())
-					increaseBy = -0.001f;
-				if (increaseBy != 0)
-					switch (this.adjustWhat)
-					{
-						case 0: // flutter
-							this.flutterPitch += increaseBy;
-							break;
-						case 1: // whistle
-							this.whistlePitchModifier += increaseBy;
-							break;
-						case 2: // turbo delay (lag)
-							this.turboDelayModifier += increaseBy;
-							break;
-					}
+				using (new GUILayout.AreaScope(new Rect((Screen.width - widthlol), Screen.height - heightlol - 200, widthlol, heightlol), "", new GUIStyle()))
+				{
+					guiStyle.fontSize = sizef;
+					guiStyle.normal.textColor = Color.white;
+					GUILayout.Label($"Whistle Mod: {whistleModifier}", guiStyle, new GUILayoutOption[0]);
+					whistleModifierString = GUILayout.TextField(whistleModifier.ToString(), 10, guiStyle, new GUILayoutOption[0]);
+					float.TryParse(whistleModifierString, out whistleModifier);
+					GUILayout.Label($"Flutter Mod: {flutterModifier}", guiStyle, new GUILayoutOption[0]);
+					flutterModifierString = GUILayout.TextField(flutterModifier.ToString(), 10, guiStyle, new GUILayoutOption[0]);
+					float.TryParse(flutterModifierString, out flutterModifier);
+					GUILayout.Label("TURBO STATS", guiStyle, new GUILayoutOption[0]);
+					GUILayout.Label($"TurboRPM:		   {Math.Round(turboRPM)}/{Math.Round(wastegateRPM)}", guiStyle, new GUILayoutOption[0]);
+					GUILayout.Label("WasegateRPM:      " + Math.Round(wastegateRPM, 2).ToString(), guiStyle, new GUILayoutOption[0]);
+					GUILayout.Label("PSI Boost:        " + PSI.ToString("0.00"), guiStyle, new GUILayoutOption[0]);
+					GUILayout.Label("WasegatePSI:      " + Math.Round(wastegatePSI, 2).ToString(), guiStyle, new GUILayoutOption[0]);
+					GUILayout.Label("FuelStarve Boost: " + Math.Round(maxboostfuel, 2).ToString(), guiStyle, new GUILayoutOption[0]);
+					GUILayout.Label("AFR factor:       " + Math.Round(afrFactor, 2).ToString(), guiStyle, new GUILayoutOption[0]);
+					GUILayout.Space(3);
+					GUILayout.Label("WEAR", guiStyle, new GUILayoutOption[0]);
+					GUILayout.Label("TurboWear:        " + Math.Round(wearMult, 2).ToString(), guiStyle, new GUILayoutOption[0]);
+					GUILayout.Space(3);
+					GUILayout.Label("DRIVETRAIN STATS", guiStyle, new GUILayoutOption[0]);
+					GUILayout.Label("RPM:             " + Math.Round(drivetrain.rpm).ToString(), guiStyle, new GUILayoutOption[0]);
+					GUILayout.Label("Kph:             " + Math.Round(SPEEDKMH.Value).ToString(), guiStyle, new GUILayoutOption[0]);
+					GUILayout.Label("Current Torque:  " + Math.Round(drivetrain.torque, 2).ToString(), guiStyle, new GUILayoutOption[0]);
+					GUILayout.Label("Current Power:   " + Math.Round(drivetrain.currentPower, 2).ToString(), guiStyle, new GUILayoutOption[0]);
+					GUILayout.Label("Power Mult:	  " + Math.Round(drivetrain.powerMultiplier, 3).ToString(), guiStyle, new GUILayoutOption[0]);
+					GUILayout.Label("Block Temp:      " + Math.Round(engineTemp.Value).ToString(), guiStyle, new GUILayoutOption[0]);
+					GUILayout.Label("Motor Stress:    " + Math.Round(motorStress / 2.5f).ToString(), guiStyle, new GUILayoutOption[0]);
+					GUILayout.Label("AFR:             " + Math.Round(AFR.Value, 2).ToString(), guiStyle, new GUILayoutOption[0]);
+				}
 			}
 		}
 
 		#endregion
 
-		internal void addWastegatePsi(float inWastegatePsi)
-		{
-			// Written, 31.10.2020
+		#endregion
 
-			this.wastegatePsi += inWastegatePsi;
+		#region Methods
+
+		private void checkAnyConflictingPart() 
+		{
+			// stock carb pipe =><= stockairfilter
+			if (carbPipe.installed && stockfilterinstalled.Value)
+				carbPipe.disassemble();
+			// turbo headers =><= stockheaders & steel headers
+			if (headers.installed && (headersinstalled.Value || raceheadersinstalled.Value))
+				headers.disassemble();
+			// turbo filters
+			if (highFlowFilter.installed && filter.installed)
+				highFlowFilter.disassemble();
 		}
-		private void turboBlowOff() 
+		private void boostGaugeNeedleReset()
 		{
-			// Written, 30.10.2020
-
-			this.turboSpoolDelayTime /= 3;
-			this.canBlowOff = false;
-			this.flutterSound.pitch = this.flutterPitch + (this.calculatedBoost / 1000);
-			if (!this.flutterSound.isPlaying)
-				this.flutterSound.Play();
-			if (this.turboParts.airFilterPart.installed)
-				this.flutterSound.volume = 0.35f;
-			else if (this.turboParts.highFlowAirFilterPart.installed)
-				this.flutterSound.volume = 0.65f;
-			else
-				this.flutterSound.volume = 0.85f;
-			this.playerStressLevel.Value -= 3f;
+			boostneedle = 18;
 		}
-		private void exhaustCrackle(bool inForce = false, bool timingBackfire = true, bool exhaustBackfire = false, bool exhaustBackfireInterupt = false, float exhaustBackfireDelay = 0)
+		private bool isPlayerLookingAt(GameObject gameObject)
 		{
-			// Written, 28.10.2020
-
-			if ((UnityEngine.Random.Range(0f, this.calculatedBoost + 10f) > 20 && this.calculatedBoost > 3) || inForce)
+			if (Physics.Raycast(Camera.main.ScreenPointToRay(Input.mousePosition), out RaycastHit hit, 1f, 1 << gameObject.layer))
 			{
-				if (timingBackfire)
-					this.backfireEvent.SendEvent("TIMINGBACKFIRE");
-				if (exhaustBackfire)
-				{
-					if (this.turboParts.turboPart.turboBackfire.isPlaying && exhaustBackfireInterupt)
-						this.turboParts.turboPart.turboBackfire.Stop();
-					if (!this.turboParts.turboPart.turboBackfire.isPlaying || exhaustBackfireInterupt)
-						if (exhaustBackfireDelay > 0)
-							this.turboParts.turboPart.turboBackfire.PlayDelayed(exhaustBackfireDelay);
-						else
-							this.turboParts.turboPart.turboBackfire.Play();
-				}
+				if (hit.collider.gameObject == gameObject)
+					return true;
 			}
+			return false;
 		}
-		private void setValues()
+		private void initEngineState()
 		{
-			// Written, 28.10.2020
+			checkAnyConflictingPart();
+			partCheck();
+			updateStockCarbInstall();
+			updateRaceCarbInstall();
+			updateBoostMultiplier();
+			exhaustcheck();
 
+		}
+		private void initSimulation()
+		{
 			try
 			{
-				// GameObjects
-				this.satuma = GameObject.Find("SATSUMA(557kg, 248)");
-				this.drivetrain = this.satuma.GetComponent<Drivetrain>();
-				this.drivetrain.clutchTorqueMultiplier = 10f;
-				this.carSimulation = this.satuma.transform.FindChild("CarSimulation").gameObject;
-				this.engine = this.carSimulation.transform.FindChild("Engine").gameObject;
-				this.exhaust = this.carSimulation.transform.FindChild("Exhaust").gameObject;
-				PlayMakerFSM exhaustFSM = PlayMakerFSM.FindFsmOnGameObject(this.exhaust, "Logic");
-				this.fromEngine = exhaustFSM.FsmVariables.FindFsmGameObject("LocationEngine").Value;
-				this.fromEngineOrginalPos = this.fromEngine.transform.localPosition;
-				this.fromEngineOrginalRot = this.fromEngine.transform.localRotation;
-				this.fromHeaders = exhaustFSM.FsmVariables.FindFsmGameObject("LocationHeaders").Value;
-				this.fromHeadersOrginalPos = this.fromHeaders.transform.localPosition;
-				this.fromHeadersOrginalRot = this.fromHeaders.transform.localRotation;
-				this.fromMuffler = exhaustFSM.FsmVariables.FindFsmGameObject("LocationMuffler").Value;
-				this.fromMufflerOrginalPos = this.fromMuffler.transform.localPosition;
-				this.fromMufflerOrginalRot = this.fromMuffler.transform.localRotation;
-				this.fromPipe = exhaustFSM.FsmVariables.FindFsmGameObject("LocationPipe").Value;
-				this.fromPipeOrginalPos = this.fromPipe.transform.localPosition;
-				this.fromPipeOrginalRot = this.fromPipe.transform.localRotation;
+				wearMult = loadedSaveData.turboWear;
+				wastegateRPM = Mathf.Clamp(loadedSaveData.wastegatePsi * RPM2PSI, MIN_WASTEGATE_RPM, MAX_WASTEGATE_RPM);
+				wastegatePSI = wastegateRPM / RPM2PSI;
+				turboDestroyed = loadedSaveData.turboDestroyed;
 
-				this.whistleSound = this.gameObject.transform.FindChild("turbospool").gameObject.GetComponent<AudioSource>();
-				this.whistleSound.minDistance = 1;
-				this.whistleSound.maxDistance = 10;
-				this.whistleSound.spatialBlend = 1;
-				this.whistleSound.loop = true; 
-				this.flutterSound = this.gameObject.transform.FindChild("flutter").gameObject.GetComponent<AudioSource>();
-				this.flutterSound.minDistance = 1;
-				this.flutterSound.maxDistance = 10;
-				this.flutterSound.spatialBlend = 1;
-				this.flutterSound.loop = false;
-				this.flutterSound.mute = false;
-				// PlaymakerFSM
-				this.carCoolingFSM = this.carSimulation.transform.FindChild("Car/Cooling").gameObject.GetComponent<PlayMakerFSM>();
-				this.backfireEvent = this.engine.transform.FindChild("Symptoms").gameObject.GetComponent<PlayMakerFSM>();
-				this.engineFuel = this.engine.transform.FindChild("Fuel").gameObject;
-				this.fuelFSM = this.engineFuel.gameObject.GetComponent<PlayMakerFSM>();
-				this.fuelEventFSM = this.engineFuel.gameObject.GetComponents<PlayMakerFSM>()[1];
-				this.airFuelMixture = this.fuelEventFSM.FsmVariables.FindFsmFloat("Mixture");
-				this.airDensity =  this.fuelEventFSM.FsmVariables.FindFsmFloat("AirDensity");
-				this.fuelPumpEfficiency = this.fuelFSM.FsmVariables.GetFsmFloat("FuelPumpEfficiency");
-				this.coolingAirRateMultiplier = this.carCoolingFSM.FsmVariables.FindFsmFloat("CoolingAirRateModifier");
-				this.playerStressLevel = PlayMakerGlobals.Instance.Variables.FindFsmFloat("PlayerStress");
-				//this.engineOilFSM = this.oil
-				this.engineTemp = PlayMakerGlobals.Instance.Variables.FindFsmFloat("EngineTemp");
-				this.fuel = PlayMakerGlobals.Instance.Variables.FindFsmFloat("Fuel");
-				this.currentVehicle = PlayMakerGlobals.Instance.Variables.FindFsmString("PlayerCurrentVehicle");
-			}
-			catch (Exception ex)
-			{
-				TurboMod.print("ERROR: {0}", ex.StackTrace);
-				throw ex;
-			}
-		}
-		private void boostCalculation() 
-		{
-			// Written, 02.11.2020
+				adjustTime = 1f;
+				GameObject satsuma = GameObject.Find("SATSUMA(557kg, 248)");
+				GameObject carSimulation = satsuma.transform.Find("CarSimulation").gameObject;
+				engine = carSimulation.transform.Find("Engine").gameObject;
+				GameObject exhaust = carSimulation.transform.Find("Exhaust").gameObject;
+				soundSpool = GameObject.Find("turbospool");
+				soundFlutter = GameObject.Find("flutter");
+				turboFlutter = soundFlutter.GetComponent<AudioSource>();
+				turboWhistle = soundSpool.GetComponent<AudioSource>();
+				drivetrain = satsuma.GetComponent<Drivetrain>();
+				engineTemp = FsmVariables.GlobalVariables.FindFsmFloat("EngineTemp");
+				Interacttext = FsmVariables.GlobalVariables.FindFsmString("GUIinteraction");
+				exhaust_fromEngine = exhaust.transform.Find("FromEngine").gameObject;
+				exhaust_fromPipe = exhaust.transform.Find("FromPipe").gameObject;
+				exhaust_fromMuffler = exhaust.transform.Find("FromMuffler").gameObject;
+				exhaust_fromHeaders = exhaust.transform.Find("FromHeaders").gameObject;
+				MOTORBLOW = carSimulation.transform.Find("Car/Redlining").GetComponent<PlayMakerFSM>();
+				BACKFIRE = engine.transform.Find("Symptoms").GetComponent<PlayMakerFSM>();
+				HEADGASKET = GameObject.Find("Database/DatabaseMotor/Headgasket").GetComponent<PlayMakerFSM>();
+				FIRE =satsuma.transform.Find("FIRE").gameObject;
+				PINGING = engine.transform.Find("SoundPinging").gameObject;
+				turboneedleobject = boostGauge.transform.GetChild(2).gameObject;
+				headertriggers = GameObject.Find("cylinder head(Clone)/Triggers Headers");
+				stockfiltertrigger = GameObject.Find("carburator(Clone)/trigger_airfilter");
+				n2otrigger = GameObject.Find("racing carburators(Clone)/trigger_n2o_injectors");
+				turbofan = GameObject.Find("motor_turbocharger_blades");
+				FUEL = engine.transform.Find("Fuel").GetComponent<PlayMakerFSM>();
+				FUELevent = engine.transform.Find("Fuel").GetComponents<PlayMakerFSM>()[1];
+				calculateMixtureState = FUELevent.FsmStates.First(_state => _state.Name == "Calculate mixture");
+				DEATH = GameObject.Find("Systems").transform.Find("Death").gameObject;
+				OIL = carSimulation.transform.Find("Engine/Oil").GetComponent<PlayMakerFSM>();
+				SWEAR = GameObject.Find("PLAYER/Pivot/AnimPivot/Camera/FPSCamera/SpeakDatabase").GetComponent<PlayMakerFSM>();
+				WEAR = carSimulation.transform.Find("MechanicalWear").GetComponent<PlayMakerFSM>();
+				HEADGASKETwear = WEAR.FsmVariables.GetFsmFloat("WearHeadgasket");
+				PISTON1wear = WEAR.FsmVariables.GetFsmFloat("WearPiston1");
+				PISTON2wear = WEAR.FsmVariables.GetFsmFloat("WearPiston2");
+				PISTON3wear = WEAR.FsmVariables.GetFsmFloat("WearPiston3");
+				PISTON4wear = WEAR.FsmVariables.GetFsmFloat("WearPiston4");
+				Fuelpumpefficiency = FUEL.FsmVariables.GetFsmFloat("FuelPumpEfficiency");
+				AFR = FUELevent.FsmVariables.FindFsmFloat("Mixture");
+				AIRDENSE = FUELevent.FsmVariables.FindFsmFloat("AirDensity");
+				CarbBowl = FUEL.FsmVariables.GetFsmFloat("CarbReserve");
+				OilLevel = OIL.FsmVariables.GetFsmFloat("Oil");
+				OilDirt = OIL.FsmVariables.GetFsmFloat("OilContaminationRate");
+				motorStress = 0f;
+				stockcarbinstalled = GameObject.Find("Database/DatabaseMotor/Carburator").GetComponent<PlayMakerFSM>().FsmVariables.FindFsmBool("Installed");
+				stockfilterinstalled = GameObject.Find("Database/DatabaseMotor/Airfilter").GetComponent<PlayMakerFSM>().FsmVariables.FindFsmBool("Installed");
+				n2oinstalled = GameObject.Find("Database/DatabaseOrders/N2O Injectors").GetComponent<PlayMakerFSM>().FsmVariables.FindFsmBool("Installed");
+				racecarbinstalled = GameObject.Find("Database/DatabaseOrders/Racing Carburators").GetComponent<PlayMakerFSM>().FsmVariables.FindFsmBool("Installed");
+				headersinstalled = GameObject.Find("Database/DatabaseMotor/Headers").GetComponent<PlayMakerFSM>().FsmVariables.FindFsmBool("Installed");
+				raceheadersinstalled = GameObject.Find("Database/DatabaseOrders/Steel Headers").GetComponent<PlayMakerFSM>().FsmVariables.FindFsmBool("Installed");
+				raceexhaustinstalled = GameObject.Find("Database/DatabaseOrders/Racing Exhaust").GetComponent<PlayMakerFSM>().FsmVariables.FindFsmBool("Installed");
+				racemufflerinstalled = GameObject.Find("Database/DatabaseOrders/Racing Muffler").GetComponent<PlayMakerFSM>().FsmVariables.FindFsmBool("Installed");
+				TURBOMESH = turbo.transform.Find("turbomesh").gameObject;
+				TURBOMESH_D = turbo.transform.Find("turbomesh_D").gameObject;
+				PLAYER = GameObject.Find("PLAYER");
+				THROTPEDAL = satsuma.transform.Find("Dashboard/Pedals/pedal_throttle").GetComponent<PlayMakerFSM>().FsmVariables.GetFsmFloat("Data");
 
-			float _calBoost = this.wastegatePsi;
-			float _delayedBoost = this.turboDelay(_calBoost, this.drivetrain.throttle, 1);
-			this.calculatedBoost = _delayedBoost;
-		}
-		private float calculateMaxBoost() 
-		{
-			// Written, 02.11.2020
+				GameObject head = GameObject.Find("cylinder head(Clone)");
+				/*// Exhaust check inject
+				GameObject.Find("headers(Clone)").FsmInject("Remove part", onHeaderRemove);
+				GameObject.Find("steel headers(Clone)").FsmInject("Remove part", onHeaderRemove);
+				head.transform.Find("Triggers Headers/trigger_headers").gameObject.FsmInject("Assemble", onHeaderAssemble);
+				head.transform.Find("Triggers Headers/trigger_steel headers").gameObject.FsmInject("Assemble", onHeaderAssemble);
+				GameObject.Find("SATSUMA(557kg, 248)/MiscParts/Triggers Exhaust Pipes/trigger_exhaust pipe").FsmInject("Assemble 2", exhaustcheck);
+				GameObject.Find("SATSUMA(557kg, 248)/MiscParts/Triggers Exhaust Pipes/trigger_racing exhaust").FsmInject("Assemble 2", exhaustcheck);
+				GameObject.Find("exhaust pipe(Clone)").FsmInject("Remove part", exhaustcheck);
+				GameObject.Find("racing exhaust(Clone)").FsmInject("Remove part", exhaustcheck);
+				GameObject.Find("SATSUMA(557kg, 248)/MiscParts/Triggers Mufflers/trigger_racing_muffler").FsmInject("Assemble 2", exhaustcheck);
+				GameObject.Find("SATSUMA(557kg, 248)/MiscParts/Triggers Mufflers/trigger_exhaust_muffler").FsmInject("Assemble 2", exhaustcheck);
+				GameObject.Find("racing muffler(Clone)").FsmInject("Remove part", exhaustcheck);
+				GameObject.Find("exhaust muffler(Clone)").FsmInject("Remove part", exhaustcheck);*/
 
-			if (this.drivetrain.rpm < this.rpmAtMaxBoost)
-				return this.wastegatePsi * (this.drivetrain.rpm / this.drivetrain.maxRPM);
-			else
-				return this.wastegatePsi * (this.rpmAtMaxBoost / this.drivetrain.maxRPM);
-		}
-		private void adjustAFR() 
-		{
-			// Written, 31.10.2020
+				// Carb install set up check inject
+			 	head.transform.Find("Triggers Carbs/trigger_carburator").gameObject.FsmInject("Assemble", updateStockCarbInstall);
+				head.transform.Find("Triggers Carbs/trigger_carburator_racing").gameObject.FsmInject("Assemble", updateRaceCarbInstall);
+				GameObject.Find("carburator(Clone)").FsmInject("Remove part", updateStockCarbInstall);
+				GameObject.Find("racing carburators(Clone)").FsmInject("Remove part", updateRaceCarbInstall);
 
-			this.airFuelRatioModifier = Convert.ToSingle(this.airFuelMixture.Value * this.drivetrain.throttle * 14.7);
-			(this.fuelEventFSM.FsmStates.First((FsmState state) => state.Name == "Calculate mixture").Actions[4] as FloatOperator).float2 = this.airDensity.Value - (this.wastegatePsi / 100);
-
-			if (this.airFuelRatioModifier > 15)
-				this.exhaustCrackle(false, true, true, true, Time.deltaTime);
-		}
-		private void turboSounds()
-		{
-			// Written, 30.10.2020
-
-			// Whistle
-			if (!this.whistleSound.isPlaying)
-				this.whistleSound.Play();
-			if (this.turboParts.airFilterPart.installed)
-			{
-				this.whistleSound.volume = this.drivetrain.rpm * 3E-05f;
-				this.whistleSound.pitch = (this.drivetrain.rpm - 500) * 0.0003f;
+				// rwd
+				drivetrain.transmission = Drivetrain.Transmissions.RWD;
+				drivetrain.differentialLockCoefficient = 100;
+				drivetrain.clutchMaxTorque = 800;
+				drivetrain.clutchTorqueMultiplier = 4;
 			}
-			else if (this.turboParts.highFlowAirFilterPart.installed)
+			catch (Exception ex) 
 			{
-				this.whistleSound.volume = this.drivetrain.rpm * 3E-05f;
-				this.whistleSound.pitch = (this.drivetrain.rpm - 500) * 0.000575f;
-			}
-			else
-			{
-				this.whistleSound.volume = this.drivetrain.rpm * 2.6E-05f;
-				this.whistleSound.pitch = (this.drivetrain.rpm - 250) * this.whistlePitchModifier;//0.00045f;
-			}
-			//
-			// Logic
-			this.whistleSound.volume *= this.calculatedBoost / this.wastegatePsi;
-			if (this.anyThrottleUsed)
-			{
-				if (this.turboSpoolDelayTime >= 1)
-					this.canBlowOff = true;
-				if (this.drivetrain.revLimiterTriggered)
-					this.exhaustCrackle(true, false, true, true, Time.deltaTime);
-			}
-			else 
-			{
-				if (this.canBlowOff && this.calculatedBoost > 1)
-					this.turboBlowOff();
-				this.exhaustCrackle();
+				ModConsole.LogError(ex.ToString());
 			}
 		}
-		private float turboDelay(float calculatedBoost, float delay, float cut)
+		public void turboCondCheck()
 		{
-			// Written, 02.11.2020
-
-			float delayedBoost = calculatedBoost * Mathf.Lerp(0, 1, this.turboSpoolDelayTime);
-			float deltaTimeDelay = Time.deltaTime * delay;
-			if (this.throttleButtonUsed)
+			GUIuse.Value = true;
+			turbofan.transform.localEulerAngles = new Vector3(turbospin, 0f, 0f);
+			if (isFiltered)
 			{
-				if (this.turboSpoolDelayTime <= cut)
-					this.turboSpoolDelayTime += deltaTimeDelay;
-			}
-			else
-			{
-				if (this.turboSpoolDelayTime >= 0)
-					this.turboSpoolDelayTime -= deltaTimeDelay > 0 ? deltaTimeDelay : Time.deltaTime;
-			}
-			return delayedBoost;
-		}
-		private void spinTurboBlades() 
-		{
-			// Written, 31.10.2020
-
-			if (string.IsNullOrEmpty(this.currentVehicle.Value))
-				this.turboBlades.transform.Rotate(new Vector3(this.drivetrain.rpm / 500, 0f, 0f));
-		}
-		private void coolOil() 
-		{
-			// Written, 31.10.2020
-
-			if (this.engineTemp.Value > 65)
-				this.engineTemp.Value -= this.turboCoolerModifier;
-			this.coolingAirRateMultiplier.Value = this.turboCoolerModifier;
-		}
-		private void wastegateCheck()
-		{
-			// Written, 01.11.2020
-
-			if (!this.turboParts.wastegateActuatorPart.installed && this.wastegatePsi != this.turboParts.wastegateActuatorPart.wastegateAdjust.wastegateMinPsi)
-			{
-				this.wastegatePsi = this.turboParts.wastegateActuatorPart.wastegateAdjust.wastegateMinPsi;
-			}
-			else if (this.wastegatePsi == default)
-				this.wastegatePsi = this.turboParts.wastegateActuatorPart.wastegateAdjust.wastegateMinPsi;
-		}
-		private void applyBoost() 
-		{
-			// Written, 31.10.2020
-
-			this.appliedPowerMultiplier = (this.rpmAtMaxBoost * this.boostMultiplier) + (this.calculatedBoost / this.turboParts.wastegateActuatorPart.wastegateAdjust.wastegateMaxPsi);
-			if (this.appliedPowerMultiplier > 0)
-				this.drivetrain.powerMultiplier = this.appliedPowerMultiplier;
-		}
-		private void turboSimulation()
-		{
-			// Written, 30.10.2020
-
-			if (this.engine.activeInHierarchy)
-			{
-				if (checkExhaust)
-					this.exhaustPipe();
-				this.wastegateCheck();
-				if (this.turboParts.oilCoolerPart.installed)
-					this.coolOil();
-				if (this.turboParts.isCorePartsInstalled())
+				if (cInput.GetButtonUp("Use") && downPipe.installed)
 				{
-					//this.calculateTurboRpm();
-					this.spinTurboBlades();
-					this.boostCalculation();
-					this.turboSounds();					
+					Interacttext.Value = "Can't check with the filter on!";
+					SWEAR.SendEvent("SWEARING");
 				}
 			}
-		}
-		private void turboSimulationLate() 
-		{
-			// Written, 02.11.2020
-
-			if (this.engine.activeInHierarchy)
-				if (this.turboParts.isCorePartsInstalled())
-					if (this.turboParts.carbPipePart.installed)
-					{
-						this.boostGauge();
-						this.adjustAFR();
-						this.applyBoost();
-					}
-
-		}
-		private float gaugeNeedleRot = 0;
-		private void boostGauge()
-		{
-			// Written, 03.11.2020
-
-			if (this.turboParts.boostGaugePart.installed)
-			{
-				this.gaugeNeedleRot = this.calculatedBoost * 10;
-				this.turboParts.boostGaugePart.gaugeNeedle.transform.localEulerAngles = new Vector3(0f, 0f, this.gaugeNeedleRot);
-			}
-		}
-		private void exhaustPipe() 
-		{
-			// Written, 04.11.2020
-
-			if (this.turboParts.headersPart.installed)
-			{
-				if (this.turboParts.turboPart.installed)
-				{
-					if (this.turboParts.downPipePart.installed)
-					{
-						this.orginalExhaustSet = false;
-						this.fromPipe.transform.SetParent(this.turboParts.turboPart.rigidPart.transform);
-						this.fromPipe.transform.localPosition = this.turboParts.downPipePart.downPipeExhaustParticlesPos;
-						this.fromPipe.transform.localRotation = this.turboParts.downPipePart.downPipeExhaustParticlesRot;
-						this.fromPipe.SetActive(true);
-						this.fromMuffler.SetActive(false);
-						this.fromEngine.SetActive(false);
-						this.fromHeaders.SetActive(false);
-						return;
-					}
-					else
-					{
-						this.orginalExhaustSet = false;
-						this.fromPipe.transform.SetParent(this.turboParts.turboPart.rigidPart.transform);
-						this.fromPipe.transform.localPosition = this.turboParts.turboPart.turboExhaustParticlesPos;
-						this.fromPipe.transform.localRotation = this.turboParts.turboPart.turboExhaustParticlesRot;
-						this.fromPipe.SetActive(true);
-						this.fromMuffler.SetActive(false);
-						this.fromEngine.SetActive(false);
-						this.fromHeaders.SetActive(false);
-						return;
-					}
-				}
-				else
-				{
-					this.orginalExhaustSet = false;
-					this.fromHeaders.transform.SetParent(this.turboParts.headersPart.rigidPart.transform);
-					this.fromHeaders.transform.localPosition = this.turboParts.headersPart.headersExhaustParticlesPos;
-					this.fromHeaders.transform.localRotation = this.turboParts.headersPart.headersExhaustParticlesRot;
-					this.fromPipe.SetActive(false);
-					this.fromMuffler.SetActive(false);
-					this.fromEngine.SetActive(false);
-					this.fromHeaders.SetActive(true);
-					return;
-				}
-			}
-			else if (!this.orginalExhaustSet)
-			{
-				this.orginalExhaustSet = true;
-				this.fromHeaders.transform.SetParent(this.exhaust.transform);
-				this.fromHeaders.transform.localPosition = this.fromHeadersOrginalPos;
-				this.fromHeaders.transform.localRotation = this.fromHeadersOrginalRot;
-				this.fromEngine.transform.SetParent(this.exhaust.transform);
-				this.fromEngine.transform.localPosition = this.fromEngineOrginalPos;
-				this.fromEngine.transform.localRotation = this.fromEngineOrginalRot;
-				this.fromPipe.transform.SetParent(this.exhaust.transform);
-				this.fromPipe.transform.localPosition = this.fromPipeOrginalPos;
-				this.fromPipe.transform.localRotation = this.fromPipeOrginalRot;
-				this.fromMuffler.transform.SetParent(this.exhaust.transform);
-				this.fromMuffler.transform.localPosition = this.fromMufflerOrginalPos;
-				this.fromMuffler.transform.localRotation = this.fromMufflerOrginalRot;
-			}
-		}
-		private void calculateTurboRpm()
-		{
-			// Written, 31.10.2020
-
-			if (this.drivetrain.rpm < this.initialRpm)
-				this.turboRpm = this.initialRpm / 14200f + this.drivetrain.rpm / (this.initialRpm * 0.95f);
-			else if (this.drivetrain.rpm > this.rpmAtMaxBoost)
-				this.turboRpm = (this.rpmAtMaxBoost * 1.75f * (this.drivetrain.throttle + 0.05f) + this.rpmAtMaxBoost * 0.08f + this.drivetrain.currentPower / 650f / 10f * this.drivetrain.throttle) * this.wastegatePsi;
 			else
-				this.turboRpm = (this.drivetrain.rpm * 1.75f * (this.drivetrain.throttle + 0.05f) + this.drivetrain.rpm * 0.08f + this.drivetrain.currentPower / 650f / 10f * this.drivetrain.throttle) * this.wastegatePsi;
-		}
-
-		// Not Mine
-		/*public void MainSim()
-		{
-			// Written, 28.10.2020
-
-			try
 			{
-				if (this.engine.activeInHierarchy && this.turboParts.isCorePartsInstalled())
+				if (turboRPM > 200)
 				{
-					/*if (this.drivetrain.rpm <= this.rpmAtMaxBoost)
-						this.calculatedBoost = this.calculateBoost();
-
-					if (this.turboParts.oilCoolerPart.installed)
+					Interacttext.Value = "That looks dangerous!";
+				}
+				if (cInput.GetButtonUp("Use"))
+				{
+					if (!engineOn)
 					{
-						if (this.engineTemp.Value > 95)
-							this.engineTemp.Value -= turboCoolerModifier;
-						this.coolingAirRateMultiplier.Value = turboCoolerModifier;
-					}
-					if (this.drivetrain.rpm > this.rpmAtMaxBoost)
-						this.turboSpool *= this.rpmAtMaxBoost / 2650f - this.drivetrain.rpm / (this.rpmAtMaxBoost * 0.61f);
-					else if (this.drivetrain.rpm < initialRpm)
-						this.turboSpool *= initialRpm / 14200f + this.drivetrain.rpm / (initialRpm * 0.95f);
-					else
-						this.turboSpool = this.drivetrain.rpm * 1.75f * (this.drivetrain.throttle + 0.05f) + this.drivetrain.rpm * 0.08f + this.drivetrain.currentPower / 650f / 10f * this.drivetrain.throttle;//this.drivetrain.rpm * 1.75f * (this.carController.throttle + 0.05f) + this.drivetrain.rpm * 0.08 + this.enginePower.Value / 660 * this.carController.throttle;
-					if (this.turboParts.wastegateActuatorPart.installed & this.turboTargetRpm != this.wastegateRpm)
-						this.turboTargetRpm = this.wastegateRpm;
-					this.turboRpm = Mathf.Clamp(this.turboRpm, 0f, this.turboTargetRpm * 5f);
-					this.wastegateSpool = this.wastegateRpm / 22f - this.friction * 3f;
-					if (this.turboRpm > this.turboTargetRpm * 0.975 && this.turboParts.wastegateActuatorPart.installed)
-						this.turboSpool = Mathf.Clamp((float)this.turboSpool, 120f, this.wastegateSpool);
-					else
-						this.turboSpool = Mathf.Clamp((float)this.turboSpool, 120f, 50000f);
-					if (string.IsNullOrEmpty(this.currentVehicle.Value))
-						this.turboBlades.transform.localEulerAngles = new Vector3(this.turboSpin, 0f, 0f);
-					this.turboRpm += (float)this.turboSpool;
-					this.turboSpin += this.turboRpm;
-					this.turboSounds();
-					if (this.turboParts.carbPipePart.installed)
-					{
-						this.airFuelRatioModifier = this.afr.Value * this.drivetrain.throttle * 14.7f;
-						this.maxBoostFuel = 13f * (this.fuelPumpEfficiency.Value * 60f + 0.25f);
-						if (this.calculatedBoost > this.maxBoostFuel)
+						turbospin += 10f;
+						if (wearMult > 99 || turboDestroyed)
 						{
-							this.timeBoosting += Time.deltaTime;
-							if (this.timeBoosting > UnityEngine.Random.Range(3, 12))
-							{
-								this.exhaustCrackle();
-								this.timeBoosting = 0;
-							}
-							this.drivetrain.powerMultiplier = this.rpmAtMaxBoost * this.boostMultiplier + calculatedBoost / 22f;
+							Interacttext.Value = "There's nothing left to check...";
+							SWEAR.SendEvent("SWEARING");
 						}
-						if (this.calculatedBoost > 1)
-							this.drivetrain.revLimiterTime = 0.1f;
+						else if (wearMult > 65)
+						{
+							Interacttext.Value = "Feels worn out, a bit of shaft play";
+							MasterAudio.PlaySound3DAndForget("Motor", turbo.transform, variationName: "damage_bearing");
+						}
+						else if (wearMult > 30)
+						{
+							Interacttext.Value = "A little used, seems fine";
+							MasterAudio.PlaySound3DAndForget("Motor", turbo.transform, variationName: "valve_knock");
+						}
+						else
+						{
+							Interacttext.Value = "Looks brand new";
+						}
 					}
-				}
-				else if (this.whistleSound.isPlaying)
-				{
-					this.whistleSound.Stop();
-				}
-			}
-			catch (Exception ex)
-			{
-				TurboMod.print("[MainSimulation] An error occured\nError: {0}", ex.StackTrace);
-			}
-			/*this.turbosounds();
-			bool flag10 = this.isPiped;
-			if (flag10)
-			{
-				this.afrFactor = this.AFR.Value * this.drivetrain.throttle * 14.7f;
-				bool flag11 = this.PSIRound > (double)this.maxboostfuel;
-				if (flag11)
-				{
-					this.timeBoost += Time.deltaTime;
-					bool flag12 = this.timeBoost > Random.Range(3f, 12f);
-					if (flag12)
+					else if (turbo.installed && turboRPM > 200)
 					{
-						this.drivetrain.revLimiterTriggered = true;
-						this.BACKFIRE.SendEvent("TIMINGBACKFIRE");
-						this.wearMult += Random.Range(0.3f, 3f);
-						this.timeBoost = 0f;
+						turboDestroyEvent();
+						deathByTurbo();
 					}
 				}
-				this.drivetrain.powerMultiplier *= this.rpmAtMaxBoost * this.boostMultiplier + this.PSI / 22f;
-				(this.FUELevent.FsmStates.First((FsmState state) => state.Name == "Calculate mixture").Actions[4] as FloatOperator).float2 = this.AIRDENSE.Value - this.PSIRART;
-				bool flag13 = this.PSIRound > 1.0;
-				if (flag13)
+			}
+		}
+		public void deathByTurbo()
+		{
+			GameObject.Find("PLAYER").transform.Find("Pivot/AnimPivot/Camera/FPSCamera/FPSCamera").GetComponents<PlayMakerFSM>().FirstOrDefault((PlayMakerFSM x) => x.Fsm.Name == "Death").SendEvent("DEATH");
+			GameObject.Find("Systems").transform.Find("Death").GetComponent<PlayMakerFSM>().FsmVariables.GetFsmBool("RunOver").Value = true;
+			GameObject.Find("Systems").transform.Find("Death").GetComponent<PlayMakerFSM>().FsmVariables.GetFsmBool("Crash").Value = false;
+			turbo.transform.Find("handgrind").gameObject.SetActive(true);
+			GameObject.Find("Systems").transform.Find("Death/GameOverScreen/Paper/HitAndRun/TextEN").GetComponent<TextMesh>().text = "Boy's \n hand eaten \n by\n turbo";
+			GameObject.Find("Systems").transform.Find("Death/GameOverScreen/Paper/HitAndRun/TextFI").GetComponent<TextMesh>().text = "Pojan käsi tuhoutui \n turboahtimella";
+		}
+		public void wasteGateAdjust()
+		{
+			wastegatePSI = wastegateRPM / RPM2PSI;
+			Interacttext.Value = "Wastegate pressure: " + wastegatePSI.ToString("0.00") + " PSI";
+			if (Input.mouseScrollDelta.y > 0f & wastegateRPM <= 194925f & adjustTime >= 1)
+			{
+				adjustTime = 0;
+				wastegateRPM += WASTEGATE_ADJUST_INTERVAL;
+				MasterAudio.PlaySound3DAndForget("CarBuilding", act.transform, variationName: "bolt_screw");
+			}
+			if (Input.mouseScrollDelta.y < 0f & wastegateRPM >= MIN_WASTEGATE_RPM & adjustTime >= 1)
+			{
+				adjustTime = 0f;
+				wastegateRPM -= WASTEGATE_ADJUST_INTERVAL;
+				MasterAudio.PlaySound3DAndForget("CarBuilding", act.transform, variationName: "bolt_screw");
+			}
+			bool flag3 = cInput.GetButtonDown("Finger") & wastegateRPM <= MAX_WASTEGATE_RPM & adjustTime >= 1;
+			if (flag3)
+			{
+				adjustTime = 0;
+				wastegateRPM = MAX_WASTEGATE_RPM;
+				MasterAudio.PlaySound3DAndForget("CarBuilding", act.transform, variationName: "bolt_screw");
+			}
+		}
+		public void partCheck()
+		{
+			turbofan.SetActive(!turboDestroyed || !(isFiltered && downPipe.installed && turbo.installed && headers.installed));
+
+			if (!headers.installed)
+			{
+				if (turboRPM > 0)
+					turboRPM -= turboSpool;
+				else if (turboRPM < 0)
+					turboRPM = 0;
+			}
+
+			isFiltered = filter.installed || highFlowFilter.installed;
+			
+			if (wearMult > 55f & !TURBOMESH_D.activeInHierarchy)
+			{
+				TURBOMESH_D.SetActive(true);
+				TURBOMESH.SetActive(false);
+			}
+			else if (!TURBOMESH.activeInHierarchy)
+			{
+				TURBOMESH.SetActive(true);
+				TURBOMESH_D.SetActive(false);
+			}
+		}
+		public void exhaustcheck()
+		{
+			isExhaust = headers.installed && turbo.installed && downPipe.installed;
+			raceheadersinstalled.Value = isExhaust;
+		}
+		public void exhaustCrackle()
+		{
+			if (PSI > 3.0 & Random.Range(0f, PSI + 10f) > 20f)
+			{
+				BACKFIRE.SendEvent("TIMINGBACKFIRE");
+			}
+		}
+		public void turbosounds()
+		{
+			soundSpool.SetActive(engineOn);
+
+			turboWhistle.pitch =  PSI / wastegatePSI * whistleModifier;
+			turboWhistle.volume = turboRPM / 200000f * 0.05f;
+			turboWhistle.volume *= isFiltered ? 0.7f : 1.25f;
+			if (drivetrain.throttle < 0.2f & isPiped)
+			{
+				exhaustCrackle();
+			}
+			if (PSI > 4.400000095367432 & THROTPEDAL.Value / 8f < 0.1f & isPiped & !drivetrain.revLimiterTriggered)
+			{
+				soundFlutter.SetActive(true);
+				turboFlutter.volume = turboWhistle.volume * (isFiltered ? 16 : 26);
+				turboFlutter.pitch = flutterModifier;
+				turboFlutter.loop = false;
+				turboFlutter.mute = false;
+				bovtimesince = 0f;
+			}
+			if (bovtimesince < 160)
+			{
+				bovtimesince += 1f;
+			}
+			if (bovtimesince > 30 & soundFlutter.activeInHierarchy)
+			{
+				soundFlutter.SetActive(false);
+				STRESS.Value -= 0.2f;
+			}
+		}
+		public void boostGaugeNeedle()
+		{
+			turboNeedleBoost = turboRPM;
+			vacsmooth = THROTPEDAL.Value / 8f * 117f;
+			vacsmooth = Mathf.Clamp(vacsmooth, drivetrain.idlethrottle * 117f, 117f);
+			vacthrot = Mathf.SmoothDamp(vacthrot, vacsmooth, ref throtsmooth, 0.05f);
+			boostneedle = 133f + -vacthrot + -turboNeedleBoost / 1600f;
+		}
+		public void turboDestroyEvent()
+		{
+			wearMult = 100;
+			turboDestroyed = true;
+			MasterAudio.PlaySound3DAndForget("Motor", turbo.transform, variationName: "damage_oilpan");
+			if (engineOn)
+			{
+				BLOWCHANCE = Random.Range(0f, drivetrain.rpm / 800f);
+				if (BLOWCHANCE >  Random.Range(1, 5))
 				{
-					this.engineTemp.Value += this.drivetrain.powerMultiplier * 4f * this.drivetrain.throttle * this.CoolMult;
-					this.drivetrain.revLimiterTime = 0.1f;
+					MOTORBLOW.SendEvent("Finished");
+				}
+			}
+			SWEAR.SendEvent("SWEARING");
+		}
+		public void turboRepairEvent()
+		{
+			wearMult = Random.Range(0.5f, 9f);
+			turboDestroyed = false;
+		}
+		public turboSimulationSaveData getSave() 
+		{
+			return new turboSimulationSaveData() { turboDestroyed = turboDestroyed, turboWear = wearMult, wastegatePsi = wastegatePSI };
+		}
+
+		#endregion
+
+		#region IEnumerators
+
+		private IEnumerator pipeFunction()
+		{
+			ModConsole.Log("Pipe Simulation: Started");
+			while (canPipeWork)
+			{
+				boostGaugeNeedle();
+				updateCarbSetup();
+				afrFactor = AFR.Value * drivetrain.throttle * 14.7f;
+				if (PSI > maxboostfuel)
+				{
+					timeBoost += Time.deltaTime;
+					if (timeBoost > Random.Range(3f, 12f))
+					{
+						drivetrain.revLimiterTriggered = true;
+						BACKFIRE.SendEvent("TIMINGBACKFIRE");
+						wearMult += Random.Range(0.3f, 3f);
+						timeBoost = 0f;
+					}
+				}
+				drivetrain.powerMultiplier *= rpmAtMaxBoost * boostMultiplier + PSI / 22;
+				(calculateMixtureState.Actions[4] as FloatOperator).float2 = AIRDENSE.Value - PSIRART;
+				//(FUELevent.FsmStates.First((FsmState state) => state.Name == "Calculate mixture").Actions[4] as FloatOperator).float2 = AIRDENSE.Value - PSIRART;
+				if (PSI > 1.0)
+				{
+					engineTemp.Value += drivetrain.powerMultiplier * 4f * drivetrain.throttle * coolMult;
+					drivetrain.revLimiterTime = 0.1f;
 				}
 				else
 				{
-					this.drivetrain.revLimiterTime = 0.2f;
+					drivetrain.revLimiterTime = 0.2f;
 				}
-				bool flag14 = turbosim.filter.isFitted & this.boostMultiplier != 0.000125f;
-				if (flag14)
-				{
-					this.boostMultiplier = 0.000125f;
-				}
-				bool flag15 = turbosim.HKSfilter.isFitted & this.boostMultiplier != 0.0001275f;
-				if (flag15)
-				{
-					this.boostMultiplier = 0.0001275f;
-					this.wearMult += this.turbowearrate / 12f;
-				}
-				bool flag16 = !this.isFiltered & this.boostMultiplier != 0.00013f;
-				if (flag16)
-				{
-					this.boostMultiplier = 0.00013f;
-					this.wearMult += this.turbowearrate / 2f;
-				}
-				this.Pistonwear = this.PISTON1wear.Value + this.PISTON2wear.Value + this.PISTON3wear.Value + this.PISTON4wear.Value;
+				//Pistonwear = PISTON1wear.Value + PISTON2wear.Value + PISTON3wear.Value + PISTON4wear.Value;
+
+				yield return null;
 			}
-			bool flag17 = !turbosim.oil_line.isFitted || this.OilLevel.Value < 1.5f;
-			if (flag17)
-			{
-				this.wearMult += this.turbowearrate * 20f;
-			}
-			else
-			{
-				this.wearMult += this.turbowearrate;
-			}
-			bool flag18 = this.drivetrain.torque > this.maxsafeTorque || this.afrFactor > 15f;
-			if (flag18)
-			{
-				bool flag19 = !this.PINGING.activeInHierarchy;
-				if (flag19)
-				{
-					this.PINGING.SetActive(true);
-				}
-				this.motorStress += this.drivetrain.torque - this.maxsafeTorque / 20000f;
-				this.motorStressint = this.motorStress / 2.5f;
-				bool flag20 = this.motorStressint >= 24500f;
-				if (flag20)
-				{
-					bool flag21 = (float)Random.Range(0, 1) > 0.5f;
-					if (flag21)
-					{
-						this.FIRE.SetActive(true);
-					}
-					this.MOTORBLOW.SendEvent("FINISHED");
-					this.BACKFIRE.SendEvent("TIMINGBACKFIRE");
-				}
-				bool flag22 = this.motorStressint >= 3350f;
-				if (flag22)
-				{
-					this.HEADGASKETwear.Value -= 0.01f;
-				}
-				bool flag23 = this.motorStressint >= 6500f;
-				if (flag23)
-				{
-					bool flag24 = this.PISTON1wear.Value > 9.5f;
-					if (flag24)
-					{
-						this.PISTON1wear.Value -= 0.009f;
-					}
-					bool flag25 = this.PISTON2wear.Value > 9.5f;
-					if (flag25)
-					{
-						this.PISTON2wear.Value -= 0.009f;
-					}
-					bool flag26 = this.PISTON3wear.Value > 9.5f;
-					if (flag26)
-					{
-						this.PISTON3wear.Value -= 0.009f;
-					}
-					bool flag27 = this.PISTON4wear.Value > 9.5f;
-					if (flag27)
-					{
-						this.PISTON4wear.Value -= 0.009f;
-					}
-				}
-			}
-			else
-			{
-				this.motorStress *= 0.99f;
-			}
+			if (boostGauge.installed)
+				boostGaugeNeedleReset();
+			pipeRoutine = null;
+			ModConsole.Log("Pipe Simulation: Finished");
 		}
-		else
+		private IEnumerator turboFunction()
 		{
-			bool activeInHierarchy = this.soundSpool.activeInHierarchy;
-			if (activeInHierarchy)
+			ModConsole.Log("Turbo Simulation: Started");
+			while (canTurboWork)
 			{
-				this.soundSpool.SetActive(false);
-				this.turboRPM = 0f;
+				try
+				{
+					PSI = turboRPM / RPM2PSI;
+					PSIRART = PSI / 100f;
+					turboSpool = drivetrain.rpm * 1.75f * (drivetrain.throttle + 0.05f) + drivetrain.rpm * 0.08f + drivetrain.currentPower / 650f / 10f * drivetrain.throttle;
+					if (drivetrain.rpm > rpmAtMaxBoost)
+					{
+						turboSpool *= rpmAtMaxBoost / 2650f - drivetrain.rpm / (rpmAtMaxBoost * 0.61f);
+					}
+					if (initialRpm > drivetrain.rpm)
+					{
+						turboSpool *= initialRpm / 14200f + drivetrain.rpm / (initialRpm * 0.95f);
+					}
+					if (act.installed && turboTargetRPM != wastegateRPM)
+					{
+						turboTargetRPM = wastegateRPM;
+					}
+					turboRPM = Mathf.Clamp(turboRPM, 0f, turboTargetRPM * 5f);
+					frictionmult = 120f + wearMult * 1.2f;
+					wgspool = wastegateRPM / 22f - frictionmult * 3f;
+					turboSpool = Mathf.Clamp(turboSpool, 120f, turboRPM > turboTargetRPM * 0.975 && act.installed ? wgspool : 55555);
+					turbofan.transform.localEulerAngles = new Vector3(turbospin, 0f, 0f);
+					turboRPM += turboSpool;
+					turboRPM -= turboFriction;
+					turboFriction = frictionmult * turboRPM / 1500f * 0.5f;
+					turbospin += turboRPM;
+					turbosounds();
+					if (wear)
+					{
+						turboDestroyed = wearMult >= 100;
+
+						turbowearrate = turboRPM / 140000000f * 0.12f;
+
+						if (!oilLines.installed || OilLevel.Value < 1.5f)
+						{
+							wearMult += turbowearrate * 20f;
+						}
+						else
+							wearMult += turbowearrate;
+
+						if (turboDestroyed)
+						{
+							turboDestroyEvent();
+						}
+						else if (wearMult <= 1)
+						{
+							turboRepairEvent();
+						}
+					}
+					if (drivetrain.torque > maxsafeTorque || afrFactor > 15)
+					{
+						if (!PINGING.activeInHierarchy)
+							PINGING.SetActive(true);
+						motorStress += drivetrain.torque - maxsafeTorque / 20000f;
+
+						if (motorStress > 24500)
+							BACKFIRE.SendEvent("TIMINGBACKFIRE");
+						if (wear)
+						{
+							if (motorStress > 24500)
+							{
+								bool flag21 = Random.Range(0, 1) > 0.5f;
+								if (flag21)
+								{
+									FIRE.SetActive(true);
+								}
+								BACKFIRE.SendEvent("TIMINGBACKFIRE");
+								BACKFIRE.SendEvent("TIMINGBACKFIRE");
+								BACKFIRE.SendEvent("TIMINGBACKFIRE");
+								BACKFIRE.SendEvent("TIMINGBACKFIRE");
+								MOTORBLOW.SendEvent("FINISHED");
+								BACKFIRE.SendEvent("TIMINGBACKFIRE");
+							}
+							if (motorStress >= 3350)
+							{
+								HEADGASKETwear.Value -= 0.01f;
+							}
+							if (motorStress >= 6500)
+							{
+								if (PISTON1wear.Value > 9.5)
+								{
+									PISTON1wear.Value -= 0.009f;
+								}
+								if (PISTON2wear.Value > 9.5)
+								{
+									PISTON2wear.Value -= 0.009f;
+								}
+								if (PISTON3wear.Value > 9.5)
+								{
+									PISTON3wear.Value -= 0.009f;
+								}
+								if (PISTON4wear.Value > 9.5)
+								{
+									PISTON4wear.Value -= 0.009f;
+								}
+							}
+						}
+					}
+					else
+					{
+						motorStress *= 0.99f;
+					}
+				}
+				catch (Exception ex)
+				{
+					ModConsole.Log(ex);
+				}
+				yield return null;
+			}
+
+			if (soundSpool.activeInHierarchy)
+			{
+				soundSpool.SetActive(false);
+				turboRPM = 0f;
+			}
+			if (turboDestroyed)
+			{
+				turboDestroyEvent();
+			}
+
+			turboRoutine = null;
+			ModConsole.Log("Turbo Simulation: Finished");
+		}
+		private IEnumerator oilCoolerFunction()
+		{
+			ModConsole.Log("Oil Cooler: Started");
+			while (canOilCoolerWork)
+			{;
+				if (engineTemp.Value > oilCoolerThermostatRating)
+				{
+					engineTemp.Value -= oilCoolerCoolingRate;
+				}
+				yield return null;
+			}
+			oilCoolerRoutine = null;
+			ModConsole.Log("Oil Cooler: Finished");
+		}
+
+		private void checkRoutinesRunning()
+		{
+			if (oilCoolerRoutine == null)
+				if (canOilCoolerWork)
+					oilCoolerRoutine = StartCoroutine(oilCoolerFunction());
+			if (turboRoutine == null)
+				if (canTurboWork)
+					turboRoutine = StartCoroutine(turboFunction());
+			if (pipeRoutine == null)
+				if (canPipeWork)
+					pipeRoutine = StartCoroutine(pipeFunction());
+		}
+
+		#endregion
+
+		#region EventHandlers
+
+		private void updateCarbSetup() 
+		{
+			if (raceCarbinstall)
+			{
+				maxsafeTorque = 185;
+				rpmAtMaxBoost = 6400;
+				maxboostfuel = 18 * (Fuelpumpefficiency.Value * 60 + 0.25f);
+			}
+			if (carbinstall)
+			{
+				maxsafeTorque = 130;
+				rpmAtMaxBoost = 6000;
+				//maxboostfuel = 13 * (Fuelpumpefficiency.Value * 60 + 0.25f);
+				maxboostfuel = 22 * (Fuelpumpefficiency.Value * 60 + 0.25f);
 			}
 		}
-		}*/
+		private void updateRaceCarbInstall() 
+		{
+			raceCarbinstall = racecarbinstalled.Value && coldSidePipe.installed && intercooler.installed && hotSidePipe.installed;
+			isPiped = carbinstall || raceCarbinstall;
+		}
+		private void updateBoostMultiplier()
+		{
+			if (isFiltered)
+			{
+				if (highFlowFilter.installed)
+					boostMultiplier = 0.0001275f;
+				if (filter.installed)
+					boostMultiplier = 0.000125f;
+			}
+			else
+			{
+				boostMultiplier = 0.0013f;
+			}
+		}
+		private void updateStockCarbInstall() 
+		{
+			carbinstall = stockcarbinstalled.Value && carbPipe.installed;
+			isPiped = carbinstall || raceCarbinstall;
+		}
+
+		#endregion
 	}
 }
