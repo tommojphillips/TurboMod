@@ -6,7 +6,7 @@ using System.Collections;
 using System.Linq;
 using UnityEngine;
 using Random = UnityEngine.Random;
-using TommoJProductions.ModApi.v0_1_3_0_alpha.Attachable;
+using TommoJProductions.ModApi.Attachable;
 
 namespace TommoJProductions.TurboMod
 {
@@ -81,6 +81,7 @@ namespace TommoJProductions.TurboMod
 		private FsmFloat STRESS = PlayMakerGlobals.Instance.Variables.FindFsmFloat("PlayerStress");
 		private FsmFloat SPEEDKMH = PlayMakerGlobals.Instance.Variables.FindFsmFloat("SpeedKMH");
 		private FsmState calculateMixtureState;
+		private FsmState calculateDensityState;
 		private GameObject turbofan;
 		private GameObject n2otrigger;
 		private GameObject stockfiltertrigger;
@@ -98,6 +99,7 @@ namespace TommoJProductions.TurboMod
 		private GameObject exhaust_fromPipe;
 		private GameObject exhaust_fromHeaders;
 		private GUIStyle guiStyle = new GUIStyle();
+		private SatsumaEngineCallback engineCallback;
 
 		// Internal fields
 		internal PlayMakerFSM SWEAR;
@@ -211,8 +213,8 @@ namespace TommoJProductions.TurboMod
 			boostGauge.onDisassemble += boostGaugeNeedleReset;
 
 			// oil cooler pipes
-			oilCooler.onAssemble += oilCoolOnAssemble;
-			oilCooler.onDisassemble += oilCoolOnDisassemble;
+			oilCooler.onAssemble += oilCoolerOnAssemble;
+			oilCooler.onDisassemble += oilCoolerOnDisassemble;
 		}
         private void OnDisable()
 		{
@@ -390,7 +392,13 @@ namespace TommoJProductions.TurboMod
 				adjustTime = 1f;
 				GameObject satsuma = GameObject.Find("SATSUMA(557kg, 248)");
 				GameObject carSimulation = satsuma.transform.Find("CarSimulation").gameObject;
+				GameObject starter = carSimulation.transform.Find("Car/Starter").gameObject;
 				engine = carSimulation.transform.Find("Engine").gameObject;
+				engineCallback = engine.AddComponent<SatsumaEngineCallback>();
+				engineCallback.onFirstTimeEnable += engineCallback_onFirstTimeEnable;
+				VehiclePushStartLogic vpsl = starter.AddComponent<VehiclePushStartLogic>();
+				vpsl.engine = engine;
+				vpsl.drivetrainReference = satsuma.GetComponent<Drivetrain>();
 				GameObject exhaust = carSimulation.transform.Find("Exhaust").gameObject;
 				soundSpool = GameObject.Find("turbospool");
 				soundFlutter = GameObject.Find("flutter");
@@ -416,6 +424,7 @@ namespace TommoJProductions.TurboMod
 				FUEL = engine.transform.Find("Fuel").GetComponent<PlayMakerFSM>();
 				FUELevent = engine.transform.Find("Fuel").GetComponents<PlayMakerFSM>()[1];
 				calculateMixtureState = FUELevent.FsmStates.First(_state => _state.Name == "Calculate mixture");
+				calculateDensityState = FUELevent.FsmStates.First(_state => _state.Name == "Calculate density");
 				DEATH = GameObject.Find("Systems").transform.Find("Death").gameObject;
 				OIL = carSimulation.transform.Find("Engine/Oil").GetComponent<PlayMakerFSM>();
 				SWEAR = GameObject.Find("PLAYER/Pivot/AnimPivot/Camera/FPSCamera/SpeakDatabase").GetComponent<PlayMakerFSM>();
@@ -466,11 +475,9 @@ namespace TommoJProductions.TurboMod
 				GameObject.Find("carburator(Clone)").FsmInject("Remove part", updateStockCarbInstall);
 				GameObject.Find("racing carburators(Clone)").FsmInject("Remove part", updateRaceCarbInstall);
 
-				// rwd
-				drivetrain.transmission = Drivetrain.Transmissions.RWD;
-				drivetrain.differentialLockCoefficient = 100;
-				drivetrain.clutchMaxTorque = 800;
-				drivetrain.clutchTorqueMultiplier = 4;
+				// rwd  cause why not
+				if (cInput.GetButton("Use"))
+					drivetrain.transmission = Drivetrain.Transmissions.RWD;
 			}
 			catch (Exception ex) 
 			{
@@ -685,8 +692,7 @@ namespace TommoJProductions.TurboMod
 					}
 				}
 				drivetrain.powerMultiplier *= rpmAtMaxBoost * boostMultiplier + PSI / 22;
-				(calculateMixtureState.Actions[4] as FloatOperator).float2 = AIRDENSE.Value - PSIRART;
-				//(FUELevent.FsmStates.First((FsmState state) => state.Name == "Calculate mixture").Actions[4] as FloatOperator).float2 = AIRDENSE.Value - PSIRART;
+				calMixtureFloatOp.float2 = AIRDENSE.Value - PSIRART;
 				if (PSI > 1.0)
 				{
 					engineTemp.Value += drivetrain.powerMultiplier * 4f * drivetrain.throttle * coolMult;
@@ -700,6 +706,7 @@ namespace TommoJProductions.TurboMod
 
 				yield return null;
 			}
+			//calMixtureFloatOp.float2 = 200;
 			if (boostGauge.installed)
 				boostGaugeNeedleReset();
 			pipeRoutine = null;
@@ -864,13 +871,21 @@ namespace TommoJProductions.TurboMod
 		#endregion
 
 		#region EventHandlers
+
+		private FloatOperator calMixtureFloatOp;
+		private void engineCallback_onFirstTimeEnable() 
+		{
+			//TurboMod.print("satsuma engine turned on for the first time this session..");
+
+			calMixtureFloatOp = calculateMixtureState.Actions[4] as FloatOperator;
+		}
 		private void oilCoolerOnAssemble() 
 		{
-			oilCooler.transform.GetChild(0).gameObject.SetActive(true);
+			//oilCooler.transform.GetChild(0).gameObject.SetActive(true);
 		}
 		private void oilCoolerOnDisassemble()
 		{
-			oilCooler.transform.GetChild(0).gameObject.SetActive(false);
+			//oilCooler.transform.GetChild(0).gameObject.SetActive(false);
 		}
 		private void updateCarbSetup() 
 		{

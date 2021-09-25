@@ -1,4 +1,4 @@
-﻿using static TommoJProductions.ModApi.v0_1_3_0_alpha.Attachable.Part;
+﻿using static TommoJProductions.ModApi.Attachable.Part;
 
 namespace TommoJProductions.TurboMod
 {

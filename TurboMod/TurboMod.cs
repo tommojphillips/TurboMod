@@ -1,8 +1,9 @@
 ﻿using MSCLoader;
 using System;
-using TommoJProductions.ModApi.v0_1_3_0_alpha.Attachable;
+using TommoJProductions.ModApi.Attachable;
 using TommoJProductions.TurboMod.Parts;
 using UnityEngine;
+using static TommoJProductions.ModApi.Attachable.Part;
 using Object = UnityEngine.Object;
 
 namespace TommoJProductions.TurboMod
@@ -37,7 +38,7 @@ namespace TommoJProductions.TurboMod
 
         public override string ID => "TurboMod";
         public override string Name => "Turbo Mod";
-        public override string Version => "0.1.1";
+        public override string Version => "0.1.2";
         public override string Author => "tommjphillips";
 
         #endregion
@@ -121,74 +122,76 @@ namespace TommoJProductions.TurboMod
 
             // Setting up turbo parts
             TurboParts turboParts = new TurboParts();
-
+            AssemblyTypeJointSettings jointSettings = new AssemblyTypeJointSettings(block.GetComponent<Rigidbody>());
+            PartSettings partSettings = new PartSettings() { assembleType = AssembleType.joint, assemblyTypeJointSettings = jointSettings };
+            PartSettings partSettings1 = new PartSettings() { assembleType = AssembleType.static_rigidbodyDelete };
             // Oil Lines
             Vector3 oilLinesTriggerPos = new Vector3(0.04f, -0.155f, -0.0845f);
             Vector3 oilLinesTriggerRot = new Vector3(270, 180, 0);
             turboParts.oilLines = Object.Instantiate(modAssets.oilLines).AddComponent<Part>();
-            turboParts.oilLines.defaultSaveInfo = new Part.PartSaveInfo() { position = new Vector3(-9.211566f, 0.3555823f, 8.223039f), rotation = new Vector3(1.59594524f, 328.505646f, 110.664665f) };
-            turboParts.oilLines.initPart(loadedSaveData.oilLines, new Trigger("oilLinesTrigger", block, oilLinesTriggerPos, oilLinesTriggerRot, scale, false));
+            turboParts.oilLines.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-9.211566f, 0.3555823f, 8.223039f), rotation = new Vector3(1.59594524f, 328.505646f, 110.664665f) };
+            turboParts.oilLines.initPart(loadedSaveData.oilLines, partSettings1, new Trigger("oilLinesTrigger", block, oilLinesTriggerPos, oilLinesTriggerRot, scale, false));
             // Oil Cooler
             Vector3 oilCoolerTriggerPos = new Vector3(-0.00385f, -0.1566f, 1.58f);
             turboParts.oilCooler = Object.Instantiate(modAssets.oilCooler).AddComponent<Part>();
-            turboParts.oilCooler.defaultSaveInfo = new Part.PartSaveInfo() { position = new Vector3(-9.857974f, 0.375454068f, 8.366342f), rotation = new Vector3(51.8120346f, 270.4507f, 3.314321E-05f) };
-            turboParts.oilCooler.initPart(loadedSaveData.oilCooler, new Trigger("oilCoolerTrigger", satsuma, oilCoolerTriggerPos, rotZero, scale, false));
+            turboParts.oilCooler.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-9.857974f, 0.375454068f, 8.366342f), rotation = new Vector3(51.8120346f, 270.4507f, 3.314321E-05f) };
+            turboParts.oilCooler.initPart(loadedSaveData.oilCooler, partSettings1, new Trigger("oilCoolerTrigger", satsuma, oilCoolerTriggerPos, rotZero, scale, false));
             // Stock Carb Pipe
             Vector3 carbPipeTriggerPos = new Vector3(0.0605f, -0.063f, 0.038f);
             Vector3 carbPipeTriggerRot = new Vector3(-90, 0, 180);
             turboParts.carbPipe = Object.Instantiate(modAssets.carbPipe).AddComponent<Part>();
-            turboParts.carbPipe.defaultSaveInfo = new Part.PartSaveInfo() { position = new Vector3(-9.787034f, 0.191437215f, 6.201254f), rotation = new Vector3(285.1606f, 51.1690636f, 175.335251f) };
-            turboParts.carbPipe.initPart(loadedSaveData.stockCarbPipe, new Trigger("carbPipeTrigger", stockCarburator, carbPipeTriggerPos, carbPipeTriggerRot, scale, false));
+            turboParts.carbPipe.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-9.787034f, 0.191437215f, 6.201254f), rotation = new Vector3(285.1606f, 51.1690636f, 175.335251f) };
+            turboParts.carbPipe.initPart(loadedSaveData.stockCarbPipe, partSettings1, new Trigger("carbPipeTrigger", stockCarburator, carbPipeTriggerPos, carbPipeTriggerRot, scale, false));
             // headers
             Vector3 headersTriggerPos = new Vector3(-0.0115f, -0.1105f, -0.04f);
             Vector3 headersTriggerRot = new Vector3(-90, 0, 180);
             turboParts.headers = Object.Instantiate(modAssets.headers).AddComponent<Part>();
-            turboParts.headers.defaultSaveInfo = new Part.PartSaveInfo() { position = new Vector3(-9.909819f, 0.179119885f, 6.45177937f), rotation = new Vector3(324.365265f, 352.000732f, 179.9617f) };
-            turboParts.headers.initPart(loadedSaveData.headers, new Trigger("headersTrigger", cylinderHead, headersTriggerPos, headersTriggerRot, scale, false));
+            turboParts.headers.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-9.909819f, 0.179119885f, 6.45177937f), rotation = new Vector3(324.365265f, 352.000732f, 179.9617f) };
+            turboParts.headers.initPart(loadedSaveData.headers, partSettings1, new Trigger("headersTrigger", cylinderHead, headersTriggerPos, headersTriggerRot, scale, false));
             // turbo
             Vector3 turboTriggerPos = new Vector3(-0.04f, -0.146f, -0.1425f);
             turboParts.turbo = Object.Instantiate(modAssets.turbo).AddComponent<Part>();
-            turboParts.turbo.defaultSaveInfo = new Part.PartSaveInfo() { position = new Vector3(-10.0278788f, 0.2243311f, 6.13207769f), rotation = new Vector3(359.891632f, 344.759369f, 270.93338f) };
-            turboParts.turbo.initPart(loadedSaveData.turbo, new Trigger("turboTrigger", turboParts.headers.gameObject, turboTriggerPos, rotZero, scale, false));
+            turboParts.turbo.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-10.0278788f, 0.2243311f, 6.13207769f), rotation = new Vector3(359.891632f, 344.759369f, 270.93338f) };
+            turboParts.turbo.initPart(loadedSaveData.turbo, partSettings1, new Trigger("turboTrigger", turboParts.headers.gameObject, turboTriggerPos, rotZero, scale, false));
             // Air filter
             Vector3 airFilterTriggerPos = new Vector3(-0.11f, 0, 0);
             Vector3 airFilterTriggerRot = new Vector3(-90, 0, 0);
             turboParts.filter = Object.Instantiate(modAssets.airFilter).AddComponent<Part>();
-            turboParts.filter.defaultSaveInfo = new Part.PartSaveInfo() { position = new Vector3(-9.6119f, 0.378927648f, 8.4703455f), rotation = new Vector3(0, 313.72f, 270) };
-            turboParts.filter.initPart(loadedSaveData.airFilter, new Trigger("airFilterTrigger", turboParts.turbo.gameObject, airFilterTriggerPos, airFilterTriggerRot, scale, false));
+            turboParts.filter.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-9.6119f, 0.378927648f, 8.4703455f), rotation = new Vector3(0, 313.72f, 270) };
+            turboParts.filter.initPart(loadedSaveData.airFilter, partSettings1, new Trigger("airFilterTrigger", turboParts.turbo.gameObject, airFilterTriggerPos, airFilterTriggerRot, scale, false));
             // High Flow Air filter
             turboParts.highFlowFilter = Object.Instantiate(modAssets.highFlowAirFilter).AddComponent<Part>();
-            turboParts.highFlowFilter.defaultSaveInfo = new Part.PartSaveInfo() { position = new Vector3(-9.758383f, 0.388716f, 8.516996f), rotation = new Vector3(22.13869f, 247.411392f, 266.338776f) };
-            turboParts.highFlowFilter.initPart(loadedSaveData.highFlowAirFilter, turboParts.filter.triggers);
+            turboParts.highFlowFilter.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-9.758383f, 0.388716f, 8.516996f), rotation = new Vector3(22.13869f, 247.411392f, 266.338776f) };
+            turboParts.highFlowFilter.initPart(loadedSaveData.highFlowAirFilter, partSettings1, turboParts.filter.triggers);
             // Wastegate
             Vector3 wastgateTriggerPos = new Vector3(-0.054f, 0.023f, 0.0557f);
             turboParts.act = Object.Instantiate(modAssets.wastegateActuator).AddComponent<Part>();
-            turboParts.act.defaultSaveInfo = new Part.PartSaveInfo() { position = new Vector3(-9.953638f, 0.164577737f, 6.27556753f), rotation = new Vector3(35.10111f, 256.410431f, 189.827179f) };
-            turboParts.act.initPart(loadedSaveData.wastegate, new Trigger("wastegateTrigger", turboParts.turbo.gameObject, wastgateTriggerPos, rotZero, scale, false));
+            turboParts.act.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-9.953638f, 0.164577737f, 6.27556753f), rotation = new Vector3(35.10111f, 256.410431f, 189.827179f) };
+            turboParts.act.initPart(loadedSaveData.wastegate, partSettings1, new Trigger("wastegateTrigger", turboParts.turbo.gameObject, wastgateTriggerPos, rotZero, scale, false));
             // Down pipe
             Vector3 downPipeTriggerPos = new Vector3(0.1434f, -0.0273f, 0.0732f);
             turboParts.downPipe = Object.Instantiate(modAssets.downPipe_race).AddComponent<Part>();
-            turboParts.downPipe.defaultSaveInfo = new Part.PartSaveInfo() { position = new Vector3(-10.1210308f, 0.205112815f, 6.258187f), rotation = new Vector3(304.177856f, 254.448318f, 288.865082f) };
-            turboParts.downPipe.initPart(loadedSaveData.downPipe, new Trigger("downPipeTrigger", turboParts.turbo.gameObject, downPipeTriggerPos, rotZero, scale, false));
+            turboParts.downPipe.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-10.1210308f, 0.205112815f, 6.258187f), rotation = new Vector3(304.177856f, 254.448318f, 288.865082f) };
+            turboParts.downPipe.initPart(loadedSaveData.downPipe, partSettings1, new Trigger("downPipeTrigger", turboParts.turbo.gameObject, downPipeTriggerPos, rotZero, scale, false));
             // Boost gauge
             turboParts.boostGauge = Object.Instantiate(modAssets.boostGauge).AddComponent<Part>();
-            turboParts.boostGauge.defaultSaveInfo = new Part.PartSaveInfo() { position = new Vector3(-9.002147f, 0.36299932f, 8.077917f), rotation = new Vector3(8.19497363E-05f, 46.88491f, -1.2716353E-05f) };
+            turboParts.boostGauge.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-9.002147f, 0.36299932f, 8.077917f), rotation = new Vector3(8.19497363E-05f, 46.88491f, -1.2716353E-05f) };
             Trigger gaugeTriggerDashboard = new Trigger("boostGaugeTriggerDashboard", dashboard, new Vector3(0.5f, -0.05f, 0.125f), new Vector3(265f, 180f, 0f), scale, false);
             Trigger gaugeTriggerSteeringColumn = new Trigger("boostGaugeTriggerSteeringColumn", satsuma, new Vector3(-0.2580001f, 0.353999f, 0.3900005f), new Vector3(26.0001f, 358.0007f, 0.8386518f), scale, false);
             Trigger gaugeTriggerShell = new Trigger("boostGaugeTriggerShell", satsuma, new Vector3(-0.5279999f, 0.6269986f, 0.3040009f), new Vector3(0, 342.0003f, 261.8372f), scale, false);
-            turboParts.boostGauge.initPart(loadedSaveData.boostGauge, gaugeTriggerDashboard, gaugeTriggerSteeringColumn, gaugeTriggerShell);            
+            turboParts.boostGauge.initPart(loadedSaveData.boostGauge, partSettings1, gaugeTriggerDashboard, gaugeTriggerSteeringColumn, gaugeTriggerShell);            
             // Intercooler
             turboParts.intercooler = Object.Instantiate(modAssets.intercooler).AddComponent<Part>();
-            turboParts.intercooler.defaultSaveInfo = new Part.PartSaveInfo() { position = new Vector3(-8.642147f, 0.36299932f, 8.077917f), rotation = new Vector3(8.19497363E-05f, 46.88491f, -1.2716353E-05f) };
-            turboParts.intercooler.initPart(loadedSaveData.intercooler, new Trigger("intercoolerTrigger", satsuma, new Vector3(0.5f, -0.05f, 0.125f), new Vector3(265f, 180f, 0f), scale, false));
+            turboParts.intercooler.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-8.642147f, 0.36299932f, 8.077917f), rotation = new Vector3(8.19497363E-05f, 46.88491f, -1.2716353E-05f) };
+            turboParts.intercooler.initPart(loadedSaveData.intercooler, partSettings1, new Trigger("intercoolerTrigger", satsuma, new Vector3(0.5f, -0.05f, 0.125f), new Vector3(265f, 180f, 0f), scale, false));
             // Hotside pipe
             turboParts.hotSidePipe = Object.Instantiate(modAssets.chargePipeHotSide_race).AddComponent<Part>();
-            turboParts.hotSidePipe.defaultSaveInfo = new Part.PartSaveInfo() { position = new Vector3(-9.042147f, 0.36299932f, 8.077917f), rotation = new Vector3(8.19497363E-05f, 46.88491f, -1.2716353E-05f) };
-            turboParts.hotSidePipe.initPart(loadedSaveData.HotSidePipe, new Trigger("hotsidepipeTrigger", turboParts.intercooler.gameObject, new Vector3(0.5f, -0.05f, 0.125f), new Vector3(265f, 180f, 0f), scale, false));
+            turboParts.hotSidePipe.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-9.042147f, 0.36299932f, 8.077917f), rotation = new Vector3(8.19497363E-05f, 46.88491f, -1.2716353E-05f) };
+            turboParts.hotSidePipe.initPart(loadedSaveData.HotSidePipe, partSettings1, new Trigger("hotsidepipeTrigger", turboParts.intercooler.gameObject, new Vector3(0.5f, -0.05f, 0.125f), new Vector3(265f, 180f, 0f), scale, false));
             // racing Carb pipe
             turboParts.coldSidePipe = Object.Instantiate(modAssets.chargePipeHotSide_race).AddComponent<Part>();
-            turboParts.coldSidePipe.defaultSaveInfo = new Part.PartSaveInfo() { position = new Vector3(-10.142147f, 0.36299932f, 8.077917f), rotation = new Vector3(8.19497363E-05f, 46.88491f, -1.2716353E-05f) };
-            turboParts.coldSidePipe.initPart(loadedSaveData.racingCarbPipe, new Trigger("racingCarbpipeTrigger", turboParts.intercooler.gameObject, new Vector3(0.5f, -0.05f, 0.125f), new Vector3(265f, 180f, 0f), scale, false));
+            turboParts.coldSidePipe.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-10.142147f, 0.36299932f, 8.077917f), rotation = new Vector3(8.19497363E-05f, 46.88491f, -1.2716353E-05f) };
+            turboParts.coldSidePipe.initPart(loadedSaveData.racingCarbPipe, partSettings1, new Trigger("racingCarbpipeTrigger", turboParts.intercooler.gameObject, new Vector3(0.5f, -0.05f, 0.125f), new Vector3(265f, 180f, 0f), scale, false));
 
             // Setting up turbo simulation
             TurboSimulation.oilCooler = turboParts.oilCooler;

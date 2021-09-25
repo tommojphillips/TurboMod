@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System.Resources;
+using System.Reflection;
 using System.Runtime.InteropServices;
 
 // General Information about an assembly is controlled through the following
@@ -8,8 +9,8 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyDescription("A turbo mod for My Summer Car")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("TommoJProductions")]
-[assembly: AssemblyProduct("TurboMod v1.1")]
-[assembly: AssemblyCopyright("Copyright ©  2020")]
+[assembly: AssemblyProduct("TurboMod v0.1.2")]
+[assembly: AssemblyCopyright("Copyright ©  2021")]
 [assembly: AssemblyTrademark("Azine")]
 [assembly: AssemblyCulture("")]
 
@@ -31,5 +32,6 @@ using System.Runtime.InteropServices;
 // You can specify all the values or you can default the Build and Revision Numbers
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("0.0.1.1")]
-[assembly: AssemblyFileVersion("0.0.1.1")]
+[assembly: AssemblyVersion("0.1.2.0")]
+[assembly: AssemblyFileVersion("0.1.2.0")]
+[assembly: NeutralResourcesLanguage("en-AU")]

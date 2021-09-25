@@ -53,9 +53,8 @@
     <Reference Include="cInput">
       <HintPath>D:\Games\SteamApps\steamapps\common\My Summer Car\mysummercar_Data\Managed\cInput.dll</HintPath>
     </Reference>
-    <Reference Include="modapi_v0130-alpha, Version=0.1.3.0, Culture=neutral, processorArchitecture=AMD64">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>D:\Games\SteamApps\steamapps\common\My Summer Car\Mods\References\modapi_v0130-alpha.dll</HintPath>
+    <Reference Include="modapi_v014-alpha">
+      <HintPath>D:\Games\SteamApps\steamapps\common\My Summer Car\Mods\References\modapi_v014-alpha.dll</HintPath>
     </Reference>
     <Reference Include="MSCLoader, Version=1.1.1.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
@@ -69,12 +68,14 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="SatsumaEngineCallback.cs" />
     <Compile Include="TurboParts.cs" />
     <Compile Include="TurboModSaveData.cs" />
     <Compile Include="TurboSimulation.cs" />
     <Compile Include="TurboModAssets.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TurboMod.cs" />
+    <Compile Include="VehiclePushStartLogic.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
