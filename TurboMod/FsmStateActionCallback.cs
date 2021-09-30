@@ -7,12 +7,14 @@ namespace TommoJProductions.TurboMod
     {
 		private event Action onEnterCallback;
 		private bool actionOnExit;
+		private bool finish;
 
-		public FsmStateActionCallback(Action action, bool onExit)
+		public FsmStateActionCallback(Action action, bool onExit, bool finish)
 		{
 			Name = nameof(action);
 			onEnterCallback += action;
 			actionOnExit = onExit;
+			this.finish = finish;
 		}
 
 		public override void OnEnter()
@@ -20,6 +22,7 @@ namespace TommoJProductions.TurboMod
 			if (actionOnExit)
 				return;
 			onEnterCallback?.Invoke();
+			if (finish)
 				Finish();
 		}
 
@@ -28,6 +31,7 @@ namespace TommoJProductions.TurboMod
 			if (!actionOnExit)
 				return;
 			onEnterCallback?.Invoke();
+			if (finish)
 				Finish();
 		}
 	}

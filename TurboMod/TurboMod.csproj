@@ -50,6 +50,7 @@
   <ItemGroup>
     <Compile Include="FsmStateActionCallback.cs" />
     <Compile Include="PlayMakerExtentions.cs" />
+    <Compile Include="testCaculations.cs" />
     <Compile Include="TurboParts.cs" />
     <Compile Include="TurboModSaveData.cs" />
     <Compile Include="TurboSimulation.cs" />

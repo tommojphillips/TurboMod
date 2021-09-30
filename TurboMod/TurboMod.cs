@@ -287,6 +287,8 @@ namespace TommoJProductions.TurboMod
                 loadParts();
                 initParts();
             }
+            ConsoleCommand.Add(new testCaculations(turboSimulation));
+
             print("{0} v{1}: Loaded", Name, Version);
         }
 

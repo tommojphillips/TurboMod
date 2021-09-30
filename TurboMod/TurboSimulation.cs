@@ -80,10 +80,10 @@ namespace TommoJProductions.TurboMod
 		private float throtsmooth;
 		private float wgspool;
 		private float vacsmooth;
-		private FloatOperator calMixtureFloatOp;
 		private FsmFloat engineTemp;
 		private FsmFloat THROTPEDAL;
 		private FsmFloat AIRDENSE;
+		private FsmFloat AMBIENTTEMPERATURE = PlayMakerGlobals.Instance.Variables.FindFsmFloat("AmbientTemperature");
 		private FsmFloat STRESS = PlayMakerGlobals.Instance.Variables.FindFsmFloat("PlayerStress");
 		private FsmFloat SPEEDKMH = PlayMakerGlobals.Instance.Variables.FindFsmFloat("SpeedKMH");
 		private GameObject turbofan;
@@ -122,11 +122,6 @@ namespace TommoJProductions.TurboMod
 		internal float PSI;
 
 		//Public fields
-		public bool carbInstall;
-		public bool isPiped;
-		public bool isFiltered;
-		public bool isExhaust;
-		public bool raceCarbInstall;
 		public bool turboDestroyed;
 		public bool wear = false;
 		public FsmBool headersinstalled;
@@ -172,7 +167,6 @@ namespace TommoJProductions.TurboMod
 		internal int sizef;
 		internal int widthlol;
 		internal int heightlol;
-		internal float PSIRART;
 
 		internal turboSimulationSaveData loadedSaveData;
 		internal turboSimulationSaveData defaultSaveData => new turboSimulationSaveData() { turboDestroyed = false, turboWear = Random.Range(75, 100) + (Random.Range(0, 100) * 0.001f), wastegatePsi = 8.25f };
@@ -185,6 +179,11 @@ namespace TommoJProductions.TurboMod
 
 		#region Properties
 
+		public bool isPiped => carbInstall || raceCarbInstall;
+		public bool isFiltered => filter.installed || highFlowFilter.installed;
+		public bool isExhaust => headers.installed && turbo.installed && downPipe.installed;
+		public bool carbInstall => stockcarbinstalled.Value && carbPipe.installed;
+		public bool raceCarbInstall => racecarbinstalled.Value && coldSidePipe.installed && intercooler.installed && hotSidePipe.installed;
 		public bool engineOn => engine.activeInHierarchy;
 		public bool canTurboWork => turbo.installed && headers.installed && !turboDestroyed && engineOn;
 		public bool canOilCoolerWork => oilCooler.installed && engineOn;
@@ -203,15 +202,15 @@ namespace TommoJProductions.TurboMod
 			highFlowFilter.onDisassemble += updateBoostMultiplier;
 
 			// carb install check
-			carbPipe.onAssemble += updateStockCarbInstall;
-			carbPipe.onDisassemble += updateStockCarbInstall;
+			carbPipe.onAssemble += checkRoutinesRunning;
+			carbPipe.onDisassemble += checkRoutinesRunning;
 			// race carb install check
-			coldSidePipe.onAssemble += updateRaceCarbInstall;
-			coldSidePipe.onDisassemble += updateRaceCarbInstall;
-			hotSidePipe.onAssemble += updateRaceCarbInstall;
-			hotSidePipe.onDisassemble += updateRaceCarbInstall;
-			intercooler.onDisassemble += updateRaceCarbInstall;
-			intercooler.onAssemble += updateRaceCarbInstall;
+			coldSidePipe.onAssemble += checkRoutinesRunning;
+			coldSidePipe.onDisassemble += checkRoutinesRunning;
+			hotSidePipe.onAssemble += checkRoutinesRunning;
+			hotSidePipe.onDisassemble += checkRoutinesRunning;
+			intercooler.onDisassemble += checkRoutinesRunning;
+			intercooler.onAssemble += checkRoutinesRunning;
 
 			// Boost gauge needle
 			boostGauge.onAssemble += boostGaugeNeedleReset;
@@ -220,6 +219,23 @@ namespace TommoJProductions.TurboMod
 			// oil cooler pipes
 			oilCooler.onAssemble += oilCoolerOnAssemble;
 			oilCooler.onDisassemble += oilCoolerOnDisassemble;
+
+			// turbo fan rpm reset
+			headers.onDisassemble += turboRpmReset;
+			turbo.onDisassemble += turboRpmReset;
+
+			// turbo fan active check
+			filter.onAssemble += turboFanCheck;
+			filter.onDisassemble += turboFanCheck;
+			highFlowFilter.onAssemble += turboFanCheck;
+			highFlowFilter.onDisassemble += turboFanCheck;
+			downPipe.onAssemble += turboFanCheck;
+			downPipe.onDisassemble += turboFanCheck;
+			headers.onAssemble += turboFanCheck;
+			headers.onDisassemble += turboFanCheck;
+			turbo.onAssemble += turboFanCheck;
+			turbo.onDisassemble += turboFanCheck;
+
 		}
         private void OnDisable()
 		{
@@ -230,15 +246,15 @@ namespace TommoJProductions.TurboMod
 			highFlowFilter.onDisassemble -= updateBoostMultiplier;
 
 			// carb install check
-			carbPipe.onAssemble -= updateStockCarbInstall;
-			carbPipe.onDisassemble -= updateStockCarbInstall;
+			carbPipe.onAssemble -= checkRoutinesRunning;
+			carbPipe.onDisassemble -= checkRoutinesRunning;
 			// race carb install check
-			coldSidePipe.onAssemble -= updateRaceCarbInstall;
-			coldSidePipe.onDisassemble -= updateRaceCarbInstall;
-			hotSidePipe.onAssemble -= updateRaceCarbInstall;
-			hotSidePipe.onDisassemble -= updateRaceCarbInstall;
-			intercooler.onDisassemble -= updateRaceCarbInstall;
-			intercooler.onAssemble -= updateRaceCarbInstall;
+			coldSidePipe.onAssemble -= checkRoutinesRunning;
+			coldSidePipe.onDisassemble -= checkRoutinesRunning;
+			hotSidePipe.onAssemble -= checkRoutinesRunning;
+			hotSidePipe.onDisassemble -= checkRoutinesRunning;
+			intercooler.onDisassemble -= checkRoutinesRunning;
+			intercooler.onAssemble -= checkRoutinesRunning;
 
 			// Boost gauge needle
 			boostGauge.onAssemble -= boostGaugeNeedleReset;
@@ -247,6 +263,26 @@ namespace TommoJProductions.TurboMod
 			// oil cooler pipes
 			oilCooler.onAssemble -= oilCoolerOnAssemble;
 			oilCooler.onDisassemble -= oilCoolerOnDisassemble;
+
+			// turbo fan rpm reset
+			headers.onDisassemble -= turboRpmReset;
+			turbo.onDisassemble -= turboRpmReset;
+
+			// turbo fan rpm reset
+			headers.onDisassemble -= turboRpmReset;
+			turbo.onDisassemble -= turboRpmReset;
+
+			// turbo fan active check
+			filter.onAssemble -= turboFanCheck;
+			filter.onDisassemble -= turboFanCheck;
+			highFlowFilter.onAssemble -= turboFanCheck;
+			highFlowFilter.onDisassemble -= turboFanCheck;
+			downPipe.onAssemble -= turboFanCheck;
+			downPipe.onDisassemble -= turboFanCheck;
+			headers.onAssemble -= turboFanCheck;
+			headers.onDisassemble -= turboFanCheck;
+			turbo.onAssemble -= turboFanCheck;
+			turbo.onDisassemble -= turboFanCheck;
 		}
 		private void Start()
 		{
@@ -258,17 +294,15 @@ namespace TommoJProductions.TurboMod
 			if (cInput.GetButton("DrivingMode") && cInput.GetButton("Finger") && adjustTime >= 4)
 			{
 				GUIdebug = !GUIdebug;
-				if (!GUIdebug)
+				if (GUIdebug)
 				{
 					Interacttext.Value = "Turbo Debug UI: ENABLED";
 					adjustTime = 0f;
-					ModConsole.Log("[turbomod]: Debug GUI: Enabled");
 				}
 				else
 				{
 					Interacttext.Value = "Turbo Debug UI: DISABLED";
 					adjustTime = 0f;
-					ModConsole.Log("[turbomod]: Debug GUI: Disabled");
 				}
 			}
 			if (adjustTime != 4)
@@ -290,12 +324,26 @@ namespace TommoJProductions.TurboMod
 				turboneedleobject.transform.localEulerAngles = new Vector3(0f, 0f, boostneedle);
 		}
 
-        #region OnGUI & GUI Fields
+		#region OnGUI & GUI Fields
 
-        private string whistleModifierString = "";
-		private string flutterModifierString = "";
 		private float whistleModifier = 1.1f;
 		private float flutterModifier = 1.3563f;
+
+		private string propertyString = "";
+		private void drawPropertyEdit(string inPropertyName, float inProperty, out float outProperty) 
+		{
+			drawProperty(inPropertyName, inProperty);
+			propertyString = GUILayout.TextField(inProperty.ToString(), 10, guiStyle, new GUILayoutOption[0]);
+			float.TryParse(propertyString, out outProperty);
+
+		}
+		private void drawProperty(string inPropertyName, object inProperty = null)
+		{
+			if (inProperty != null)
+				GUILayout.Label($"{inPropertyName}: {inProperty}", guiStyle, new GUILayoutOption[0]);
+			else
+				GUILayout.Label($"{inPropertyName}", guiStyle, new GUILayoutOption[0]);
+		}
 
 		private void OnGUI()
 		{
@@ -309,19 +357,17 @@ namespace TommoJProductions.TurboMod
 				{
 					guiStyle.fontSize = sizef;
 					guiStyle.normal.textColor = Color.white;
-					GUILayout.Label($"Whistle Mod: {whistleModifier}", guiStyle, new GUILayoutOption[0]);
-					whistleModifierString = GUILayout.TextField(whistleModifier.ToString(), 10, guiStyle, new GUILayoutOption[0]);
-					float.TryParse(whistleModifierString, out whistleModifier);
-					GUILayout.Label($"Flutter Mod: {flutterModifier}", guiStyle, new GUILayoutOption[0]);
-					flutterModifierString = GUILayout.TextField(flutterModifier.ToString(), 10, guiStyle, new GUILayoutOption[0]);
-					float.TryParse(flutterModifierString, out flutterModifier);
-					GUILayout.Label("TURBO STATS", guiStyle, new GUILayoutOption[0]);
-					GUILayout.Label($"TurboRPM:     {Math.Round(turboRPM)}/{Math.Round(wastegateRPM)}", guiStyle, new GUILayoutOption[0]);
-					GUILayout.Label("WasegateRPM:      " + Math.Round(wastegateRPM, 2).ToString(), guiStyle, new GUILayoutOption[0]);
-					GUILayout.Label("PSI Boost:        " + PSI.ToString("0.00"), guiStyle, new GUILayoutOption[0]);
-					GUILayout.Label("WasegatePSI:      " + Math.Round(wastegatePSI, 2).ToString(), guiStyle, new GUILayoutOption[0]);
-					GUILayout.Label("FuelStarve Boost: " + Math.Round(maxBoostFuel, 2).ToString(), guiStyle, new GUILayoutOption[0]);
-					GUILayout.Label("AFR factor:       " + Math.Round(afrFactor, 2).ToString(), guiStyle, new GUILayoutOption[0]);
+
+					drawPropertyEdit("whistle modifer", whistleModifier, out whistleModifier);
+					drawPropertyEdit("flutter modifier", flutterModifier, out flutterModifier);
+					drawPropertyEdit("Curve factor", drivetrain.curveFactor, out drivetrain.curveFactor);
+
+					drawProperty("Turbo STATS");
+					drawProperty("Turbo RPM", Math.Round(turboRPM));
+					drawProperty("WasegateRPM", Math.Round(wastegateRPM));
+					drawProperty("PSI", PSI.ToString("0.00"));
+					drawProperty("WastegatePSI", Math.Round(wastegatePSI, 2));
+					drawProperty("fuel starve boost", Math.Round(maxBoostFuel, 2));					
 					GUILayout.Space(3);
 					GUILayout.Label("WEAR", guiStyle, new GUILayoutOption[0]);
 					GUILayout.Label("TurboWear:        " + Math.Round(wearMult, 2).ToString(), guiStyle, new GUILayoutOption[0]);
@@ -334,7 +380,16 @@ namespace TommoJProductions.TurboMod
 					GUILayout.Label("Power Mult:	  " + Math.Round(drivetrain.powerMultiplier, 3).ToString(), guiStyle, new GUILayoutOption[0]);
 					GUILayout.Label("Block Temp:      " + Math.Round(engineTemp.Value).ToString(), guiStyle, new GUILayoutOption[0]);
 					GUILayout.Label("Motor Stress:    " + Math.Round(motorStress / 2.5f).ToString(), guiStyle, new GUILayoutOption[0]);
-					GUILayout.Label("AFR:             " + Math.Round(AFR.Value, 2).ToString(), guiStyle, new GUILayoutOption[0]);
+					GUILayout.Space(3);
+					GUILayout.Label("OTHER STATS", guiStyle, new GUILayoutOption[0]);
+					GUILayout.Label($"AFR:                {Math.Round(AFR.Value, 2)} ({Math.Round(AFR.Value, 2) * 14.7})", guiStyle, new GUILayoutOption[0]);
+					GUILayout.Label($"Ambient Temp:       {Math.Round(AMBIENTTEMPERATURE.Value, 2)}", guiStyle, new GUILayoutOption[0]);
+					GUILayout.Label($"Air Density:        {AIRDENSE.Value}", guiStyle, new GUILayoutOption[0]);
+					GUILayout.Label($"Throttle Pedal:     {THROTPEDAL.Value}", guiStyle, new GUILayoutOption[0]);
+					GUILayout.Label($"curveFactor:     {drivetrain.curveFactor}", guiStyle, new GUILayoutOption[0]);
+					GUILayout.Space(3);
+					GUILayout.Label("CALCULATED STATS", guiStyle, new GUILayoutOption[0]);
+					drawProperty("Calculated density", calDensityFloatOp?.float1.Value);
 				}
 			}
 		}
@@ -365,11 +420,7 @@ namespace TommoJProductions.TurboMod
 		{
 			//checkAnyConflictingPart();
 			partCheck();
-			updateStockCarbInstall();
-			updateRaceCarbInstall();
 			updateBoostMultiplier();
-			exhaustcheck();
-
 		}
 		private void initSimulation()
 		{
@@ -449,9 +500,9 @@ namespace TommoJProductions.TurboMod
                 #region Carb install set up/check/inject
 
                 // Carb install set up check inject
-                head.transform.Find("Triggers Carbs/trigger_carburator").gameObject.FsmInject("Assemble", updateStockCarbInstall);
-				head.transform.Find("Triggers Carbs/trigger_carburator_racing").gameObject.FsmInject("Assemble", updateRaceCarbInstall);
-				GameObject.Find("carburator(Clone)").FsmInject("Remove part", updateStockCarbInstall);
+                head.transform.Find("Triggers Carbs/trigger_carburator").gameObject.FsmInject("Assemble", checkRoutinesRunning);
+				head.transform.Find("Triggers Carbs/trigger_carburator_racing").gameObject.FsmInject("Assemble", checkRoutinesRunning);
+				GameObject.Find("carburator(Clone)").FsmInject("Remove part", checkRoutinesRunning);
 
 				GameObject orderRaceCarb = GameObject.Find("Database/DatabaseOrders/Racing Carburators");
 				PlayMakerFSM orderRaceCarbData = orderRaceCarb.GetPlayMaker("Data");
@@ -469,7 +520,7 @@ namespace TommoJProductions.TurboMod
 				#region starter inject
 
 				// starter inject
-				starter.injectAction("Starter", "Crank up",  PlayMakerExtentions.injectEnum.append, onEngineCrankUp);
+				starter.injectAction("Starter", "Start engine",  PlayMakerExtentions.injectEnum.append, onEngineCrankUp);
 
 				ModConsole.Print("[starter hooked]");
 
@@ -604,18 +655,7 @@ namespace TommoJProductions.TurboMod
 		}
 		public void partCheck()
 		{
-			turbofan.SetActive(!turboDestroyed || !(isFiltered && downPipe.installed && turbo.installed && headers.installed));
-
-			if (!headers.installed)
-			{
-				if (turboRPM > 0)
-					turboRPM -= turboSpool;
-				else if (turboRPM < 0)
-					turboRPM = 0;
-			}
-
-			isFiltered = filter.installed || highFlowFilter.installed;
-			
+						
 			if (wearMult > 55f & !TURBOMESH_D.activeInHierarchy)
 			{
 				TURBOMESH_D.SetActive(true);
@@ -627,10 +667,7 @@ namespace TommoJProductions.TurboMod
 				TURBOMESH_D.SetActive(false);
 			}
 		}
-		public void exhaustcheck()
-		{
-			isExhaust = headers.installed && turbo.installed && downPipe.installed;			
-		}
+
 		public void updateExhaust()
 		{
 			if (isExhaust)
@@ -688,7 +725,7 @@ namespace TommoJProductions.TurboMod
 				BACKFIRE.SendEvent("TIMINGBACKFIRE");
 			}
 		}
-		public void turbosounds()
+		public void turboSounds()
 		{
 			soundSpool.SetActive(engineOn);
 
@@ -740,11 +777,13 @@ namespace TommoJProductions.TurboMod
 				}
 			}
 			SWEAR.SendEvent("SWEARING");
+			turboFanCheck();
 		}
 		public void turboRepairEvent()
 		{
 			wearMult = Random.Range(0.5f, 9f);
 			turboDestroyed = false;
+			turboFanCheck();
 		}
 		public turboSimulationSaveData getSave() 
 		{
@@ -762,35 +801,32 @@ namespace TommoJProductions.TurboMod
 			{
 				boostGaugeNeedle();
 				updateCarbSetup();
-				afrFactor = AFR.Value * drivetrain.throttle * 14.7f;
+				//onCalculateDensity(true);
+				//updateCalculateDensityClamp(true);
+				//updateCaculateMixutureOperation(true);
+				//onCalculateMixture();
+				//onCheckMixture(true);
 				if (PSI > maxBoostFuel)
 				{
-					timeBoost += Time.deltaTime;
-					if (timeBoost > Random.Range(3f, 12f))
-					{
-						drivetrain.revLimiterTriggered = true;
-						BACKFIRE.SendEvent("TIMINGBACKFIRE");
-						wearMult += Random.Range(0.3f, 3f);
-						timeBoost = 0f;
-					}
+					fuelStarveEvent();
 				}
-				drivetrain.powerMultiplier *= maxBoostRpm * boostMultiplier + PSI / 22;
+				drivetrain.powerMultiplier *= maxBoostRpm * boostMultiplier + PSI / 10;
 				if (PSI > 1.0)
 				{
 					engineTemp.Value += drivetrain.powerMultiplier * 4f * drivetrain.throttle * coolMult;
-					drivetrain.revLimiterTime = 0.1f;
+					drivetrain.revLimiterTime = 0.11f - (PSI / 1000);
 				}
 				else
 				{
 					drivetrain.revLimiterTime = 0.2f;
 				}
-				if (wear)
-					pistonWear = PISTON1wear.Value + PISTON2wear.Value + PISTON3wear.Value + PISTON4wear.Value;
-
 				yield return null;
 			}
-			if (boostGauge.installed)
-				boostGaugeNeedleReset();
+			//onCalculateDensity(false);
+			//updateCalculateDensityClamp(false);
+			//updateCaculateMixutureOperation(false);
+			//onCheckMixture(false);
+			boostGaugeNeedleReset();
 			pipeRoutine = null;
 			ModConsole.Log("Pipe Simulation: Finished");
 		}
@@ -802,15 +838,17 @@ namespace TommoJProductions.TurboMod
 				try
 				{
 					PSI = turboRPM / RPM2PSI;
-					PSIRART = PSI / 100f;
-					turboSpool = drivetrain.rpm * 1.75f * (drivetrain.throttle + 0.05f) + drivetrain.rpm * 0.08f + drivetrain.currentPower / 650f / 10f * drivetrain.throttle;
+
+					float rpmInitial = Mathf.Clamp(drivetrain.rpm - initialRpm, 0, drivetrain.rpm);
+
+					turboSpool = rpmInitial * 1.75f * (drivetrain.throttle + 0.05f) + rpmInitial * 0.08f + drivetrain.torque / 650f / 10f * drivetrain.throttle;
 					if (drivetrain.rpm > maxBoostRpm)
 					{
-						turboSpool *= maxBoostRpm / 2650f - drivetrain.rpm / (maxBoostRpm * 0.61f);
+						turboSpool *= maxBoostRpm / 2650f - rpmInitial / (maxBoostRpm * 0.61f);
 					}
 					if (initialRpm > drivetrain.rpm)
 					{
-						turboSpool *= initialRpm / 14200f + drivetrain.rpm / (initialRpm * 0.95f);
+						turboSpool *= initialRpm / 14200f + rpmInitial / (initialRpm * 0.95f);
 					}
 					if (act.installed && turboTargetRPM != wastegateRPM)
 					{
@@ -825,82 +863,7 @@ namespace TommoJProductions.TurboMod
 					turboRPM -= turboFriction;
 					turboFriction = frictionmult * turboRPM / 1500f * 0.5f;
 					turbospin += turboRPM;
-					turbosounds();
-					if (wear)
-					{
-						turboDestroyed = wearMult >= 100;
-
-						turbowearrate = turboRPM / 140000000f * 0.12f;
-
-						if (!oilLines.installed || OilLevel.Value < 1.5f)
-						{
-							wearMult += turbowearrate * 20f;
-						}
-						else
-							wearMult += turbowearrate;
-
-						if (turboDestroyed)
-						{
-							turboDestroyEvent();
-						}
-						else if (wearMult <= 1)
-						{
-							turboRepairEvent();
-						}
-					}
-					if (drivetrain.torque > maxSafeTorque || afrFactor > 15)
-					{
-						if (!PINGING.activeInHierarchy)
-							PINGING.SetActive(true);
-						motorStress += drivetrain.torque - maxSafeTorque / 20000f;
-
-						if (motorStress > 24500)
-							BACKFIRE.SendEvent("TIMINGBACKFIRE");
-						if (wear)
-						{
-							if (motorStress > 24500)
-							{
-								bool flag21 = Random.Range(0, 1) > 0.5f;
-								if (flag21)
-								{
-									FIRE.SetActive(true);
-								}
-								BACKFIRE.SendEvent("TIMINGBACKFIRE");
-								BACKFIRE.SendEvent("TIMINGBACKFIRE");
-								BACKFIRE.SendEvent("TIMINGBACKFIRE");
-								BACKFIRE.SendEvent("TIMINGBACKFIRE");
-								MOTORBLOW.SendEvent("FINISHED");
-								BACKFIRE.SendEvent("TIMINGBACKFIRE");
-							}
-							if (motorStress >= 3350)
-							{
-								HEADGASKETwear.Value -= 0.01f;
-							}
-							if (motorStress >= 6500)
-							{
-								if (PISTON1wear.Value > 9.5)
-								{
-									PISTON1wear.Value -= 0.009f;
-								}
-								if (PISTON2wear.Value > 9.5)
-								{
-									PISTON2wear.Value -= 0.009f;
-								}
-								if (PISTON3wear.Value > 9.5)
-								{
-									PISTON3wear.Value -= 0.009f;
-								}
-								if (PISTON4wear.Value > 9.5)
-								{
-									PISTON4wear.Value -= 0.009f;
-								}
-							}
-						}
-					}
-					else
-					{
-						motorStress *= 0.99f;
-					}
+					turboSounds();
 				}
 				catch (Exception ex)
 				{
@@ -954,19 +917,133 @@ namespace TommoJProductions.TurboMod
 
 		#region EventHandlers
 
-		private void onCalculateMixture()
+		private void fuelStarveEvent() 
 		{
-			if (canPipeWork)
+			timeBoost += Time.deltaTime;
+			if (timeBoost > Random.Range(3f, 12f))
 			{
-				calMixtureFloatOp.float2.Value += AIRDENSE.Value + PSIRART;
+				drivetrain.revLimiterTriggered = true;
+				BACKFIRE.SendEvent("TIMINGBACKFIRE");
+				if (wear)
+					wearMult += Random.Range(0.3f, 3f);
+				timeBoost = 0f;
 			}
 		}
-		private void isExhaustCheck() 
+
+		internal float calculateSaturationVapourPressure(float T) 
 		{
-			exhaustcheck();
+			// p₁ = 6.1078 * 10^[7.5*T /(T + 237.3)]
+
+			float p1 = 6.1078f * Mathf.Log10(7.5f * T / (T + 237.3f));
+
+			return p1;
+		}
+		internal float calculateDewPoint(float T, float RH) 
+		{
+			// DP = 243.12 * α / (17.62 - α)
+			// α = ln(RH/100) + 17.62 * T / (243.12 + T).
+
+			float a = Mathf.Log(RH / 100) + 17.62f * T / (243.12f + T);
+
+			float DP = 243.12f * a / (17.62f - a); // calculated dew point
+
+			return DP;
+		}
+
+		public const float PASCAL = 6894.76f;
+		public const float KELVIN = 274.15f;
+		public const float DRY_GAS_CONSTANT = 287.058f;
+		public const float WET_GAS_CONSTANT = 461.495f;
+		internal float calculateAirDensity(float pressure) 
+		{
+			// FORMULA: ρ = (pd / (Rd * T)) + (pv / (Rv * T))
+
+			float RH = 0.20534f; // Relative humidity | Ranges between 0% (dry) and 100% (completly saturated with water vapour)
+			float Tc = engineTemp.Value;//AMBIENTTEMPERATURE.Value;  // temp in c
+			float Tk = Tc + KELVIN; // temperature in kelvin
+
+			float pv = calculateSaturationVapourPressure(Tc) * RH; // water vapour in C
+			float pd = pressure - pv; // pressure in pounds pre square inch (psi)
+
+			pv *= PASCAL; // water vapour in pascals
+			pd *= PASCAL; // pressure in pascals
+
+			float result = (pd / (DRY_GAS_CONSTANT * Tk)) + (pv / (WET_GAS_CONSTANT * Tk)); // in kilogram per meter cubic (Kg/m3)
+
+			return result;
+
+			//return result / 1000; // in gram per meter cubic (g/m3
+		}
+		internal void onCheckMixture(bool pipeWorking)
+		{
+			if (pipeWorking)
+			{
+				//checkMixtureAirFuelMixture.float2 = 12.5f;
+				checkMixtureLean.float2 = 15;
+				checkMixtureRich.float2 = 11.6f;
+				checkMixtureSuperRich.float2 = 10;
+				checkMixtureSputter.float2 = 9.4f;
+				checkMixtureOff.float2 = 7.27f;
+			}
+			else
+			{
+				//checkMixtureAirFuelMixture.float2 = 14.7f;
+				checkMixtureLean.float2 = 16;
+				checkMixtureRich.float2 = 14.05f;
+				checkMixtureSuperRich.float2 = 12.7f;
+				checkMixtureSputter.float2 = 10;
+				checkMixtureOff.float2 = 8;
+			}
+		}
+		internal void updateCaculateMixutureOperation(bool pipeWorking)
+		{
+			if (pipeWorking)
+			{
+				calMixtureFloatOp.operation = FloatOperator.Operation.Multiply;
+			}
+			else
+			{
+				calMixtureFloatOp.operation = FloatOperator.Operation.Divide;
+			}
+		}
+		internal void updateCalculateDensityClamp(bool pipeWorking) 
+		{
+			if (pipeWorking)
+			{
+				calDensityFloatClamp.minValue.Value = -10;
+				calDensityFloatClamp.maxValue.Value = 10;
+			}
+			else
+			{
+				calDensityFloatClamp.minValue.Value = 0.9f;
+				calDensityFloatClamp.maxValue.Value = 1.1f;
+			}
+		}
+		internal void onCalculateDensity(bool pipeWorking)
+		{
+			calDensityFloatOp.float1.Value = 0.36f;
+			if (pipeWorking)
+				calDensityFloatOp.float1.Value += calculateAirDensity(PSI);
+		}
+		internal void onCalculateMixture()
+		{
+			calMixtureFloatOp.float2.Value = AIRDENSE.Value - calculateAirDensity(PSI / 10);
+		}
+		private void exhaustCheck() 
+		{
 			updateExhaust();
 			checkRoutinesRunning();
 		}
+
+		private FloatCompare checkMixtureLean;
+		private FloatCompare checkMixtureRich;
+		private FloatCompare checkMixtureSuperRich;
+		private FloatCompare checkMixtureSputter;
+		private FloatCompare checkMixtureOff;
+		private FloatOperator checkMixtureAirFuelMixture;
+		private FloatOperator calMixtureFloatOp;
+		private FloatOperator calDensityFloatOp;
+		private FloatClamp calDensityFloatClamp;
 		private void onEngineCrankUp() 
 		{
 			string message = $"[Engine Cranked Over {(engineCrankFirstTime ? "First Time" : "")}]";
@@ -976,19 +1053,32 @@ namespace TommoJProductions.TurboMod
 				engineCrankFirstTime = true;
 
 				// cal mixture inject
-				calMixtureFloatOp = fuelGo.GetPlayMakerState("Calculate mixture").Actions[4] as FloatOperator;
-				fuelGo.injectAction("Mixture", "Calculate mixture", PlayMakerExtentions.injectEnum.insert, onCalculateMixture, index: 5);
+				FsmState calMixture = fuelGo.GetPlayMakerState("Calculate mixture");
+				calMixtureFloatOp = calMixture.Actions[4] as FloatOperator;
+
+				// check mixture
+				FsmState checkMixture = fuelGo.GetPlayMakerState("Check mixture");
+				checkMixtureLean = checkMixture.Actions[6] as FloatCompare;
+				checkMixtureRich = checkMixture.Actions[5] as FloatCompare;
+				checkMixtureSuperRich = checkMixture.Actions[4] as FloatCompare;
+				checkMixtureSputter = checkMixture.Actions[3] as FloatCompare;
+				checkMixtureOff = checkMixture.Actions[2] as FloatCompare;
+				checkMixtureAirFuelMixture = checkMixture.Actions[0] as FloatOperator;
+
+				// cal density
+				FsmState calDensity = fuelGo.GetPlayMakerState("Calculate density");
+				calDensityFloatOp = calDensity.Actions[5] as FloatOperator;
+				calDensityFloatClamp = calDensity.Actions[6] as FloatClamp;
 
 				// exhaust update
 				exhaust.injectAction("Logic", "Engine", PlayMakerExtentions.injectEnum.insert, updateExhaust, index: 5);
 
-				turbo.onAssemble += isExhaustCheck;
-				turbo.onDisassemble += isExhaustCheck;
-				headers.onAssemble += isExhaustCheck;
-				headers.onDisassemble += isExhaustCheck;
-				downPipe.onAssemble += isExhaustCheck;
-				downPipe.onDisassemble += isExhaustCheck;
-				updateExhaust();
+				turbo.onAssemble += exhaustCheck;
+				turbo.onDisassemble += exhaustCheck;
+				headers.onAssemble += exhaustCheck;
+				headers.onDisassemble += exhaustCheck;
+				downPipe.onAssemble += exhaustCheck;
+				downPipe.onDisassemble += exhaustCheck;
 			}
 			checkRoutinesRunning();
 			
@@ -1007,24 +1097,19 @@ namespace TommoJProductions.TurboMod
 			if (raceCarbInstall)
 			{
 				maxSafeTorque = 185;
+
+				initialRpm = 2500;
 				maxBoostRpm = 6400;
-				maxBoostFuel = 18 * (Fuelpumpefficiency.Value * 100 + 0.47f);
+				maxBoostFuel = 18 * (Fuelpumpefficiency.Value * 60 + 0.25f);
 			}
 			if (carbInstall)
 			{
 				maxSafeTorque = 130;
 
-				//maxBoostRpm = 6000;
-				//maxboostfuel = 13 * (Fuelpumpefficiency.Value * 100 + 0.47f);
-				maxBoostRpm = 8000;
-				maxBoostFuel = 22 * (Fuelpumpefficiency.Value * 100 + 0.47f);
+				initialRpm = 2500;
+				maxBoostRpm = 6000;
+				maxBoostFuel = 36 * (Fuelpumpefficiency.Value * 60 + 0.25f);
 			}
-		}
-		private void updateRaceCarbInstall() 
-		{
-			raceCarbInstall = racecarbinstalled.Value && coldSidePipe.installed && intercooler.installed && hotSidePipe.installed;
-			isPiped = carbInstall || raceCarbInstall;
-			checkRoutinesRunning();
 		}
 		private void updateBoostMultiplier()
 		{
@@ -1040,15 +1125,9 @@ namespace TommoJProductions.TurboMod
 				boostMultiplier = 0.0013f;
 			}
 		}
-    	private void updateStockCarbInstall() 
-		{
-			carbInstall = stockcarbinstalled.Value && carbPipe.installed;
-			isPiped = carbInstall || raceCarbInstall;
-			checkRoutinesRunning();
-		}
 		private void onRaceCarbPurchased()
 		{
-			GameObject.Find("racing carburators(Clone)").FsmInject("Remove part", updateRaceCarbInstall);
+			GameObject.Find("racing carburators(Clone)").FsmInject("Remove part", checkRoutinesRunning);
 		}
 		private void onRaceExhaustPurchased()
 		{
@@ -1099,6 +1178,14 @@ namespace TommoJProductions.TurboMod
 				GameObject mufflerTriggers = GameObject.Find("SATSUMA(557kg, 248)/MiscParts/Triggers Mufflers");
 				mufflerTriggers.transform.Find("trigger_racing_muffler").gameObject.injectAction("Assembly", "Assemble 2", PlayMakerExtentions.injectEnum.append, updateExhaust);
 			}
+		}
+		private void turboRpmReset() 
+		{
+			turboRPM = 0;
+		}
+		private void turboFanCheck()
+		{
+			turbofan.SetActive(!turboDestroyed || !(isFiltered && downPipe.installed && turbo.installed && headers.installed));
 		}
 
 		#endregion

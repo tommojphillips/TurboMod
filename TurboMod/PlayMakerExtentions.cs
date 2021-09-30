@@ -63,11 +63,11 @@ namespace TommoJProductions.TurboMod
 			temp.Insert(index, action);
 			state.Actions = temp.ToArray();
 		}
-		public static void injectAction(this GameObject go, string fsmName, string stateName, injectEnum injectType, Action callback, bool onExit = false, int index = 0)
+		public static void injectAction(this GameObject go, string fsmName, string stateName, injectEnum injectType, Action callback, bool onExit = false, bool finish = true, int index = 0)
 		{
 			PlayMakerFSM fsm = go.GetPlayMaker(fsmName);
 			FsmState state = go.GetPlayMakerState(stateName);
-			FsmStateActionCallback _callback = new FsmStateActionCallback(callback, onExit);
+			FsmStateActionCallback _callback = new FsmStateActionCallback(callback, onExit, finish);
 			switch (injectType)
 			{
 				case injectEnum.append:
