@@ -1,5 +1,5 @@
-﻿using UnityEngine;
-using MSCLoader;
+﻿using MSCLoader;
+using UnityEngine;
 
 namespace TommoJProductions.TurboMod
 {
@@ -10,13 +10,13 @@ namespace TommoJProductions.TurboMod
         private PlayMakerFSM starterFsm;
         private bool engineOn => engine.activeInHierarchy;
         private int previousGear;
-        void Start() 
+        void Start()
         {
             starterFsm = gameObject.GetPlayMaker("Starter");
         }
-        void Update() 
+        void Update()
         {
-            if (!engineOn) 
+            if (!engineOn)
             {
                 if (drivetrainReference.velo > drivetrainReference.clutch.speedDiff)
                 {
@@ -26,7 +26,7 @@ namespace TommoJProductions.TurboMod
                 }
             }
         }
-        public void pushStart() 
+        public void pushStart()
         {
             starterFsm.SendEvent("PUSHSTART");
         }

@@ -24,7 +24,7 @@ namespace TommoJProductions.TurboMod
 
         internal Material turboGlowMat;
 
-        internal TurboModAssets(GameObject inPrefab) 
+        internal TurboModAssets(GameObject inPrefab)
         {
             // Written, 27.10.2020
 
