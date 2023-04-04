@@ -1,4 +1,4 @@
-﻿using static TommoJProductions.ModApi.Attachable.Part;
+﻿using TommoJProductions.ModApi.Attachable;
 
 namespace TommoJProductions.TurboMod
 {
@@ -8,7 +8,8 @@ namespace TommoJProductions.TurboMod
         public PartSaveInfo airFilter;
         public PartSaveInfo boostGauge;
         public PartSaveInfo stockCarbPipe;
-        public PartSaveInfo downPipe;
+        public PartSaveInfo downPipeRace;
+        public PartSaveInfo downPipeStraight;
         public PartSaveInfo headers;
         public PartSaveInfo highFlowAirFilter;
         public PartSaveInfo oilCooler;
@@ -18,8 +19,6 @@ namespace TommoJProductions.TurboMod
         public PartSaveInfo HotSidePipe;
         public PartSaveInfo racingCarbPipe;
 
-        public bool turboDestroyed;
-        public float turboWear;
-        public float wastegatePsi;
+        public SimulationSaveData simulation = new SimulationSaveData();
     }
 }

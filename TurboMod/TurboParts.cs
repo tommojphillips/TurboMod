@@ -1,6 +1,9 @@
-﻿using TommoJProductions.ModApi.Attachable;
+﻿using System.Linq;
+using System.Reflection;
 
-namespace TommoJProductions.TurboMod.Parts
+using TommoJProductions.ModApi.Attachable;
+
+namespace TommoJProductions.TurboMod
 {
     public class TurboParts
     {
@@ -19,5 +22,7 @@ namespace TommoJProductions.TurboMod.Parts
         public Part downPipe { get; set; }
         public Part hotSidePipe { get; set; }
         public Part coldSidePipe { get; set; }
+
+        public Part downPipe2 { get; set; }
     }
 }

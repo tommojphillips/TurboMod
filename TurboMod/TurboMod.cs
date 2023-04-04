@@ -1,9 +1,10 @@
 ﻿using HutongGames.PlayMaker;
 using MSCLoader;
 using System;
+using System.IO;
 using TommoJProductions.ModApi;
 using TommoJProductions.ModApi.Attachable;
-using TommoJProductions.TurboMod.Parts;
+using TommoJProductions.ModApi.Database;
 using UnityEngine;
 using static TommoJProductions.ModApi.Attachable.Part;
 using Object = UnityEngine.Object;
@@ -14,38 +15,20 @@ namespace TommoJProductions.TurboMod
     {
         // Project start, 26.10.2020
 
-        #region CONSTRAINTS
-
-
-        /// <summary>
-        /// Represents if the mod has been complied for x64
-        /// </summary>
-#if x64
-        internal const bool IS_64_BIT = true;
-#else
-        internal const bool IS_64_BIT = false;
-#endif
-
-#if DEBUG
-        internal const bool IS_DEBUG_CONFIG = true;
-#else
-        internal const bool IS_DEBUG_CONFIG = false;
-#endif
-
-        public string turboPartsSaveFileName = "turboparts_savedata";
-
-        #endregion
-
         #region Mod Properties
 
         public override string ID => "TurboMod";
         public override string Name => "Turbo Mod";
-        public override string Version => "0.1.2";
-        public override string Author => "tommjphillips";
+        public override string Description => description;
+        public override string Version => VersionInfo.version;
+        public override string Author => "tommojphillips";
 
         #endregion
 
         #region Fields
+
+        public string turboPartsSaveFileName = "turboparts_savedata";
+        private readonly string description = $"CONFIG: {(VersionInfo.IS_64_BIT ? "x64" : "x86")} | {(VersionInfo.IS_DEBUG_CONFIG ? "Debug" : "Release")}\nLatest Release Date: {VersionInfo.lastestRelease}";
 
         /// <summary>
         /// Represents the turbo mod assets.
@@ -55,26 +38,18 @@ namespace TommoJProductions.TurboMod
         /// Represents the turbo simulation instance.
         /// </summary>
         internal TurboSimulation turboSimulation;
+        /// <summary>
+        /// Represents the turbo simulation instance.
+        /// </summary>
+        internal Simulation simulation;
 
         #endregion
 
         #region Properties
 
         internal GameObject blowThroughCarb;
-        internal Part bowlAssembly;
-        internal Part bowlCoverAssembly;
-        internal Part throttleBodyAssembly;
-        internal Part intakeManifold;
-        internal Part chokeLinkage;
-        internal Part plug1;
-        internal Part plug2;
-        internal Part primaryMainJet;
-        internal Part secondaryMainJet;
-        internal Part chokeFlap;
-        internal ButterflyNut butterflyNut;
-        internal Part fuelLine;
-        internal Part ventExtention;
-        internal Part stockAirFilterBracket;
+        internal GameObject bowlVentExtention;
+        internal CarbParts carbParts { get; private set; }
         internal TurboParts turboParts { get; private set; }
         internal bool assetsLoaded { get; private set; }
         internal static TurboMod instance
@@ -110,7 +85,7 @@ namespace TommoJProductions.TurboMod
 
             try
             {
-                AssetBundle ab = ModAssets.LoadBundle(this, "dazyturbo.unity3d");
+                AssetBundle ab = LoadAssets.LoadBundle(this, "dazyturbo.unity3d");
                 modAssets = new TurboModAssets(ab.LoadAsset("TURBOPARTS.prefab") as GameObject);
                 assetsLoaded = true;
                 ab.Unload(false);
@@ -130,8 +105,9 @@ namespace TommoJProductions.TurboMod
         {
             try
             {
-                AssetBundle ab = ModAssets.LoadBundle(this, "blowthroughcarb.unity3d");
+                AssetBundle ab = LoadAssets.LoadBundle(this, "blowthroughcarb.unity3d");
                 blowThroughCarb = ab.LoadAsset("blow through carb") as GameObject;
+                bowlVentExtention = ab.LoadAsset("bowl vent extention") as GameObject;
                 ab.Unload(false);
                 print("BlowThroughCarb Asset bundle loaded and unloaded successfully.");
             }
@@ -148,277 +124,301 @@ namespace TommoJProductions.TurboMod
         private void initCarbParts()
         {
             blowThroughCarb = Object.Instantiate(blowThroughCarb);
-            GameObject stockCarburator = GameObject.Find("carburator(Clone)");
+            GameObject stockCarburator = Database.databaseMotor.carburator;
             GameObject intakeManifold = blowThroughCarb.transform.Find("Intake Manifold").gameObject;
-            stockCarburator.GetComponent<MeshFilter>().mesh = intakeManifold.GetComponent<MeshFilter>().mesh;//blowThroughCarb.GetComponent<MeshFilter>().mesh;
+            stockCarburator.GetComponent<MeshFilter>().mesh = intakeManifold.GetComponent<MeshFilter>().mesh;
 
-            BoxCollider bc = stockCarburator.GetComponents<BoxCollider>()[0];
-            bc.center = new Vector3(-0.025f, -0.03027601f, 0.03529148f);
-            bc.size = new Vector3(0.08f, 0.08f, 0.1f);
+            BoxCollider sc_bc0 = stockCarburator.GetComponents<BoxCollider>()[0];
+            BoxCollider sc_bc1 = stockCarburator.GetComponents<BoxCollider>()[1];
+            sc_bc0.center = sc_bc1.center;
+            sc_bc0.size = sc_bc1.size;
 
             GameObject gm_t;
             MeshCollider mc_t;
+            BoxCollider bc_t;
             Rigidbody r_t;
             PartSaveInfo dsi_t = new PartSaveInfo() { installed = true };
-            PartSettings ps_t = null;
+            PartSettings ps_t = new PartSettings() { setPhysicsMaterialOnInitialisePart = true, installEitherDirection = true };
+            carbParts = new CarbParts();
 
-            try
-            {
-                /*// Intake Manifold
-                gm_t = blowThroughCarb.transform.Find("Intake Manifold").gameObject;
-                gm_t.name += "(xxxxx)";
-                mc_t = gm_t.AddComponent<MeshCollider>();
-                mc_t.convex = true;
-                r_t = gm_t.AddComponent<Rigidbody>();
-                r_t.mass = 2.12f;
-                intakeManifold = gm_t.AddComponent<Part>();
-                intakeManifold.defaultSaveInfo = dsi_t;
-                intakeManifold.initPart(null, ps_t, new Trigger("IntakeManifoldTrigger", stockCarburator, eulerAngles: new Vector3(-90, 0)));*/
+            // stock air filter bracket
+            gm_t = intakeManifold.transform.FindChild("Stock Air Filter Bracket").gameObject;
+            gm_t.name += "(xxxxx)";
+            mc_t = gm_t.AddComponent<MeshCollider>();
+            mc_t.convex = true;
+            r_t = gm_t.AddComponent<Rigidbody>();
+            r_t.mass = 3.12f;
+            carbParts.stockAirFilterBracket = gm_t.AddComponent<Part>();
+            carbParts.stockAirFilterBracket.defaultSaveInfo = dsi_t;
+            carbParts.stockAirFilterBracket.initPart(null, ps_t, new Trigger("stockAirBracketTrigger", stockCarburator, new Vector3(-0.005243294f, -0.1265122f, 0.04283164f)));
+            // Throttle Body Assembly
+            gm_t = blowThroughCarb.transform.Find("Throttle Body Assembly").gameObject;
+            gm_t.name += "(xxxxx)";
+            mc_t = gm_t.AddComponent<MeshCollider>();
+            mc_t.convex = true;
+            r_t = gm_t.AddComponent<Rigidbody>();
+            r_t.mass = 5.75f;
+            carbParts.throttleBodyAssembly = gm_t.AddComponent<Part>();
+            carbParts.throttleBodyAssembly.defaultSaveInfo = dsi_t;
+            carbParts.throttleBodyAssembly.initPart(null, ps_t, new Trigger("ThrottleBodyAssemblyTrigger", stockCarburator, new Vector3(-0.009168934f, -0.03201637f, 0.01415297f)));
+            // Choke Linkage
+            gm_t = carbParts.throttleBodyAssembly.transform.Find("Choke Linkage").gameObject;
+            gm_t.name += "(xxxxx)";
+            mc_t = gm_t.AddComponent<MeshCollider>();
+            mc_t.convex = true;
+            r_t = gm_t.AddComponent<Rigidbody>();
+            r_t.mass = 3.34f;
+            carbParts.chokeLinkage = gm_t.AddComponent<Part>();
+            carbParts.chokeLinkage.defaultSaveInfo = dsi_t;
+            carbParts.chokeLinkage.initPart(null, ps_t, new Trigger("ChokeLinkageTrigger", carbParts.throttleBodyAssembly.gameObject, new Vector3(-0.0394093f, 0.004382544f, 0.01736239f)));
+            // Bowl Assembly
+            gm_t = blowThroughCarb.transform.Find("Bowl Assembly").gameObject;
+            gm_t.name += "(xxxxx)";
+            mc_t = gm_t.AddComponent<MeshCollider>();
+            mc_t.convex = true;
+            r_t = gm_t.AddComponent<Rigidbody>();
+            r_t.mass = 5.5f;
+            carbParts.bowlAssembly = gm_t.AddComponent<Part>();
+            carbParts.bowlAssembly.defaultSaveInfo = dsi_t;
+            carbParts.bowlAssembly.initPart(null, ps_t, new Trigger("BowlAssemblyTrigger", carbParts.throttleBodyAssembly.gameObject, new Vector3(0.04101953f, -0.0005388409f, 0.00732623f)));
+            // Jet Plugs
+            Trigger primaryJetPlugTrigger = new Trigger("PrimaryMainJetPlugTrigger", carbParts.bowlAssembly.gameObject, new Vector3(0.01506174f, -0.01314122f, -0.01447441f), new Vector3(90, 30, 0), new Vector3(0.025f, 0.025f, 0.025f));
+            Trigger secondaryJetPlugTrigger = new Trigger("SecondaryMainJetPlugTrigger", carbParts.bowlAssembly.gameObject, new Vector3(0.01506174f, 0.01010124f, -0.01447441f), new Vector3(90, 30, 0), new Vector3(0.025f, 0.025f, 0.025f));
+            // Plug 1
+            gm_t = carbParts.bowlAssembly.transform.Find("Primary Main Jet Plug").gameObject;
+            gm_t.name = "Plug 1(xxxxx)";
+            mc_t = gm_t.AddComponent<MeshCollider>();
+            mc_t.convex = true;
+            r_t = gm_t.AddComponent<Rigidbody>();
+            r_t.mass = 3.16f;
+            carbParts.plug1 = gm_t.AddComponent<Part>();
+            carbParts.plug1.defaultSaveInfo = dsi_t;
+            carbParts.plug1.initPart(null, ps_t, primaryJetPlugTrigger, secondaryJetPlugTrigger);
+            // Plug 2
+            gm_t = carbParts.bowlAssembly.transform.Find("Secondary Main Jet Plug").gameObject;
+            gm_t.name = "Plug 2(xxxxx)";
+            mc_t = gm_t.AddComponent<MeshCollider>();
+            mc_t.convex = true;
+            r_t = gm_t.AddComponent<Rigidbody>();
+            r_t.mass = 3.16f;
+            carbParts.plug2 = gm_t.AddComponent<Part>();
+            carbParts.plug2.defaultSaveInfo = dsi_t;
+            carbParts.plug2.defaultSaveInfo.installedPointIndex = 1;
+            carbParts.plug2.initPart(null, ps_t, primaryJetPlugTrigger, secondaryJetPlugTrigger);
+            // Bowl Cover Assembly
+            gm_t = blowThroughCarb.transform.Find("Bowl Cover Assembly").gameObject;
+            gm_t.name += "(xxxxx)";
+            bc_t = gm_t.AddComponent<BoxCollider>();
+            bc_t.size = new Vector3(0.11f, 0.09f, 0.04f);
+            bc_t.center = new Vector3(0.003f, 0.00725f, 0.001f);
+            r_t = gm_t.AddComponent<Rigidbody>();
+            r_t.mass = 4.15f;
+            carbParts.bowlCoverAssembly = gm_t.AddComponent<Part>();
+            carbParts.bowlCoverAssembly.defaultSaveInfo = dsi_t;
+            carbParts.bowlCoverAssembly.initPart(null, ps_t, new Trigger("BowlCoverAssemblyTrigger", carbParts.bowlAssembly.gameObject, new Vector3(-0.02103544f, -0.005265802f, 0.04428745f)));
+            // stock fuel line
+            gm_t = carbParts.bowlCoverAssembly.transform.Find("fuel line").gameObject;
+            gm_t.name += "(xxxxx)";
+            mc_t = gm_t.AddComponent<MeshCollider>();
+            mc_t.convex = true;
+            r_t = gm_t.AddComponent<Rigidbody>();
+            r_t.mass = 3.75f;
+            carbParts.fuelLine = gm_t.AddComponent<Part>();
+            carbParts.fuelLine.defaultSaveInfo = dsi_t;
+            carbParts.fuelLine.initPart(null, ps_t, new Trigger("fuelLineTrigger", carbParts.bowlCoverAssembly.gameObject, new Vector3(0.0698068f, 0.04171099f, 0.001277313f)));
+            // Primary Bowl Vent
+            gm_t = carbParts.bowlCoverAssembly.transform.Find("Primary Bowl Vent").gameObject;
+            gm_t.transform.SetParent(carbParts.bowlCoverAssembly.transform);
+            gm_t.transform.localPosition = new Vector3(0.01668233f, -0.01764342f, 0.003289564f);
+            gm_t.transform.localRotation = Quaternion.Euler(90, -40.59985f, 0);
+            gm_t.transform.localScale = new Vector3(1.2f, 1.3f, 1.2f);
+            // Secondary Bowl Vent
+            gm_t = carbParts.bowlCoverAssembly.transform.Find("Secondary Bowl Vent").gameObject;
+            gm_t.transform.SetParent(carbParts.bowlCoverAssembly.transform);
+            gm_t.transform.localPosition = new Vector3(0.01606204f, 0.02470794f, 0.00257996f);
+            gm_t.transform.localRotation = Quaternion.Euler(90, -40.59985f, 0);
+            gm_t.transform.localScale = new Vector3(1.2f, 1.35f, 1.2f);
+            // Bowl Vent Extentions
+            Trigger primaryVentExtentionTrigger = new Trigger("PrimaryVentExtentionTrigger", carbParts.bowlCoverAssembly.gameObject, new Vector3(-0.00047f, 0.02413f, 0.0327f), new Vector3(59, -90, -90), new Vector3(0.025f, 0.025f, 0.025f));
+            Trigger secondaryVentExtentionTrigger = new Trigger("SecondaryVentExtentionTrigger", carbParts.bowlCoverAssembly.gameObject, new Vector3(0.00155f, -0.0173f, 0.0327f), new Vector3(89, -90, -90), new Vector3(0.025f, 0.025f, 0.025f));
+            // Vent Extention 1
+            gm_t = Object.Instantiate(bowlVentExtention);
+            gm_t.name = "Vent Extention 1(xxxxx)";
+            mc_t = gm_t.AddComponent<MeshCollider>();
+            mc_t.convex = true;
+            r_t = gm_t.AddComponent<Rigidbody>();
+            r_t.mass = 3.2f;
+            carbParts.ventExtention1 = gm_t.AddComponent<Part>();
+            carbParts.ventExtention1.defaultSaveInfo = dsi_t;
+            carbParts.ventExtention1.initPart(null, ps_t, primaryVentExtentionTrigger, secondaryVentExtentionTrigger);
+            // Vent Extention 2
+            gm_t = Object.Instantiate(bowlVentExtention);
+            gm_t.name = "Vent Extention 2(xxxxx)";
+            mc_t = gm_t.AddComponent<MeshCollider>();
+            mc_t.convex = true;
+            r_t = gm_t.AddComponent<Rigidbody>();
+            r_t.mass = 3.2f;
+            carbParts.ventExtention2 = gm_t.AddComponent<Part>();
+            carbParts.ventExtention2.defaultSaveInfo = dsi_t;
+            carbParts.ventExtention2.defaultSaveInfo.installedPointIndex = 1;
+            carbParts.ventExtention2.initPart(null, ps_t, primaryVentExtentionTrigger, secondaryVentExtentionTrigger);
+            // Choke Flap
+            gm_t = carbParts.bowlCoverAssembly.transform.Find("Choke ").gameObject;
+            gm_t.name += "Flap(xxxxx)";
+            bc_t = gm_t.AddComponent<BoxCollider>();
+            bc_t.size = new Vector3(0.06f, 0.02f, 0.03f);
+            bc_t.center = new Vector3(0, 0, 0.01f);
+            r_t = gm_t.AddComponent<Rigidbody>();
+            r_t.mass = 3.75f;
+            carbParts.chokeFlap = gm_t.AddComponent<Part>();
+            carbParts.chokeFlap.defaultSaveInfo = dsi_t;
+            carbParts.chokeFlap.initPart(null, ps_t, new Trigger("ChokeFlapTrigger", carbParts.bowlCoverAssembly.gameObject, new Vector3(-0.01292261f, 0.01317625f, 0.004566887f)));
 
-                // stock air filter bracket
-                gm_t = intakeManifold.transform.FindChild("Stock Air Filter Bracket").gameObject;
-                gm_t.name += "(xxxxx)";
-                mc_t = gm_t.AddComponent<MeshCollider>();
-                mc_t.convex = true;
-                r_t = gm_t.AddComponent<Rigidbody>();
-                r_t.mass = 1.12f;
-                stockAirFilterBracket = gm_t.AddComponent<Part>();
-                stockAirFilterBracket.defaultSaveInfo = dsi_t;
-                stockAirFilterBracket.initPart(null, ps_t, new Trigger("stockAirBracketTrigger", stockCarburator/*intakeManifold.gameObject*/, new Vector3(-0.005243294f, -0.1265122f, 0.04283164f)));
-                // Throttle Body Assembly
-                gm_t = blowThroughCarb.transform.Find("Throttle Body Assembly").gameObject;
-                gm_t.name += "(xxxxx)";
-                mc_t = gm_t.AddComponent<MeshCollider>();
-                mc_t.convex = true;
-                r_t = gm_t.AddComponent<Rigidbody>();
-                r_t.mass = 1.75f;
-                throttleBodyAssembly = gm_t.AddComponent<Part>();
-                throttleBodyAssembly.defaultSaveInfo = dsi_t;
-                throttleBodyAssembly.initPart(null, ps_t, new Trigger("ThrottleBodyAssemblyTrigger", stockCarburator/*intakeManifold.gameObject*/));
-                // Choke Linkage
-                gm_t = throttleBodyAssembly.transform.Find("Choke Linkage").gameObject;
-                gm_t.name += "(xxxxx)";
-                mc_t = gm_t.AddComponent<MeshCollider>();
-                mc_t.convex = true;
-                r_t = gm_t.AddComponent<Rigidbody>();
-                r_t.mass = 1.34f;
-                chokeLinkage = gm_t.AddComponent<Part>();
-                chokeLinkage.defaultSaveInfo = dsi_t;
-                chokeLinkage.initPart(null, ps_t, new Trigger("ChokeLinkageTrigger", throttleBodyAssembly.gameObject, new Vector3(-0.0011f, 0, 0)));
-                // Bowl Assembly
-                gm_t = blowThroughCarb.transform.Find("Bowl Assembly").gameObject;
-                gm_t.name += "(xxxxx)";
-                mc_t = gm_t.AddComponent<MeshCollider>();
-                mc_t.convex = true;
-                r_t = gm_t.AddComponent<Rigidbody>();
-                r_t.mass = 1.5f;
-                bowlAssembly = gm_t.AddComponent<Part>();
-                bowlAssembly.defaultSaveInfo = dsi_t;
-                bowlAssembly.initPart(null, ps_t, new Trigger("BowlAssemblyTrigger", throttleBodyAssembly.gameObject));
-                // Jet Plugs
-                Trigger primaryJetPlugTrigger = new Trigger("PrimaryMainJetPlugTrigger", bowlAssembly.gameObject, new Vector3(0.04691233f, -0.04569645f, 0.007004794f), new Vector3(90, 30, 0), new Vector3(0.025f, 0.025f, 0.025f));
-                Trigger secondaryJetPlugTrigger = new Trigger("SecondaryMainJetPlugTrigger", bowlAssembly.gameObject, new Vector3(0.04691233f, -0.02245399f, 0.007004794f), new Vector3(90, 30, 0), new Vector3(0.025f, 0.025f, 0.025f));
-                // Plug 1
-                gm_t = bowlAssembly.transform.Find("Primary Main Jet Plug").gameObject;
-                gm_t.name = "Plug 1(xxxxx)";
-                mc_t = gm_t.AddComponent<MeshCollider>();
-                mc_t.convex = true;
-                r_t = gm_t.AddComponent<Rigidbody>();
-                r_t.mass = 1.16f;
-                plug1 = gm_t.AddComponent<Part>();
-                plug1.defaultSaveInfo = dsi_t;
-                plug1.initPart(null, ps_t, primaryJetPlugTrigger, secondaryJetPlugTrigger);
-                // Plug 2
-                gm_t = bowlAssembly.transform.Find("Secondary Main Jet Plug").gameObject;
-                gm_t.name = "Plug 2(xxxxx)";
-                mc_t = gm_t.AddComponent<MeshCollider>();
-                mc_t.convex = true;
-                r_t = gm_t.AddComponent<Rigidbody>();
-                r_t.mass = 1.16f;
-                plug2 = gm_t.AddComponent<Part>();
-                plug2.defaultSaveInfo = new PartSaveInfo() { installed = true, installedPointIndex = 1 };
-                plug2.initPart(null, ps_t, primaryJetPlugTrigger, secondaryJetPlugTrigger);
-                /*// Primary Main Jet Plug
-                gm_t = bowlAssembly.transform.Find("Primary Main Jet Plug").gameObject;
-                gm_t.name += "(xxxxx)";
-                mc_t = gm_t.AddComponent<MeshCollider>();
-                mc_t.convex = true;
-                r_t = gm_t.AddComponent<Rigidbody>();
-                r_t.mass = 1.16f;
-                primaryMainJetPlug = gm_t.AddComponent<Part>();
-                primaryMainJetPlug.defaultSaveInfo = dsi_t;
-                primaryMainJetPlug.initPart(null, ps_t, new Trigger("PrimaryMainJetPlugTrigger", bowlAssembly.gameObject, new Vector3(0.04691233f, -0.04569645f, 0.007004794f), new Vector3(90, 30, 0)));
-                // Secondary Main Jet Plug
-                gm_t = bowlAssembly.transform.Find("Secondary Main Jet Plug").gameObject;
-                gm_t.name += "(xxxxx)";
-                mc_t = gm_t.AddComponent<MeshCollider>();
-                mc_t.convex = true;
-                r_t = gm_t.AddComponent<Rigidbody>();
-                r_t.mass = 1.16f;
-                secondaryMainJetPlug = gm_t.AddComponent<Part>();
-                secondaryMainJetPlug.defaultSaveInfo = dsi_t;
-                secondaryMainJetPlug.initPart(null, ps_t, new Trigger("SecondaryMainJetPlugTrigger", bowlAssembly.gameObject, new Vector3(0.04691233f, -0.02245399f, 0.007004794f), new Vector3(90, 30, 0)));
-                */
-                // Bowl Cover Assembly
-                gm_t = blowThroughCarb.transform.Find("Bowl Cover Assembly").gameObject;
-                gm_t.name += "(xxxxx)";
-                mc_t = gm_t.AddComponent<MeshCollider>();
-                mc_t.convex = true;
-                r_t = gm_t.AddComponent<Rigidbody>();
-                r_t.mass = 1.15f;
-                bowlCoverAssembly = gm_t.AddComponent<Part>();
-                bowlCoverAssembly.defaultSaveInfo = dsi_t;
-                bowlCoverAssembly.initPart(null, ps_t, new Trigger("BowlCoverAssemblyTrigger", bowlAssembly.gameObject));
-                // stock fuel line
-                gm_t = bowlCoverAssembly.transform.Find("fuel line").gameObject;
-                gm_t.name += "(xxxxx)";
-                mc_t = gm_t.AddComponent<MeshCollider>();
-                mc_t.convex = true;
-                r_t = gm_t.AddComponent<Rigidbody>();
-                r_t.mass = 0.75f;
-                fuelLine = gm_t.AddComponent<Part>();
-                fuelLine.defaultSaveInfo = dsi_t;
-                fuelLine.initPart(null, ps_t, new Trigger("fuelLineTrigger", bowlCoverAssembly.gameObject, new Vector3(0.08062196f, 0.003889954f, 0.067044f)));
-                // Butterfly nut
-                gm_t = bowlCoverAssembly.transform.Find("butterfly nut").gameObject;
-                gm_t.name += "(xxxxx)";
-                mc_t = gm_t.AddComponent<MeshCollider>();
-                mc_t.convex = true;
-                gm_t.transform.SetParent(bowlCoverAssembly.transform);
-                gm_t.transform.localPosition = new Vector3(-0.004761983f, -0.03577598f, 0.1526694f);
-                gm_t.sendToLayer(LayerMasksEnum.Parts);
-                gm_t.tag = "DontPickThis";
-                butterflyNut = gm_t.AddComponent<ButterflyNut>();
-                butterflyNut.posDirection = Vector3.back;
-                butterflyNut.onTight += TurboSimulation.butterflyNut_onCheck;
-                butterflyNut.onLoose += TurboSimulation.butterflyNut_onCheck;
-                butterflyNut.outLoose += TurboSimulation.butterflyNut_outLoose;
-                butterflyNut.tightness = 8;
-                TurboSimulation.butterflyNut = butterflyNut;
-                // Primary Bowl Vent
-                gm_t = bowlCoverAssembly.transform.Find("Primary Bowl Vent").gameObject;
-                gm_t.transform.SetParent(bowlCoverAssembly.transform);
-                gm_t.transform.localPosition = new Vector3(0.04238489f, -0.05182877f, 0.04917666f);
-                gm_t.transform.localRotation = Quaternion.Euler(90, -40.59985f, 0);
-                gm_t.transform.localScale = new Vector3(1.2f, 1.3f, 1.2f);
-                // Secondary Bowl Vent
-                gm_t = bowlCoverAssembly.transform.Find("Secondary Bowl Vent").gameObject;
-                gm_t.transform.SetParent(bowlCoverAssembly.transform);
-                gm_t.transform.localPosition = new Vector3(0.04238489f, -0.009477421f, 0.04917666f);
-                gm_t.transform.localRotation = Quaternion.Euler(90, -40.59985f, 0);
-                gm_t.transform.localScale = new Vector3(1.2f, 1.3f, 1.2f);
-                // Choke Flap
-                gm_t = bowlCoverAssembly.transform.Find("Choke ").gameObject;
-                print("[debug]CHOKE_NAME: {0}", gm_t.name);
-                gm_t.name += "Flap(xxxxx)";
-                mc_t = gm_t.AddComponent<MeshCollider>();
-                mc_t.convex = true;
-                r_t = gm_t.AddComponent<Rigidbody>();
-                r_t.mass = 2.75f;
-                chokeFlap = gm_t.AddComponent<Part>();
-                chokeFlap.defaultSaveInfo = dsi_t;
-                chokeFlap.initPart(null, ps_t, new Trigger("ChokeFlapTrigger", bowlCoverAssembly.gameObject, new Vector3(-0.0011f, 0)));
-            }
-            catch (Exception ex)
-            {
-                ModConsole.Error(ex.ToString());
-            }            
+            // setting up turbo simulation
+
+            TurboSimulation.carbParts = carbParts;
 
             ModConsole.Print("init blow through carb parts");
-
         }
         /// <summary>
         /// Initializes all turbo parts
         /// </summary>
         private void initTurboParts()
         {
-            // Written, 27.10.2020 
-            Vector3 scale = new Vector3(0.05f, 0.05f, 0.05f);
+            // Written, 27.10.2020
+
             Vector3 rotZero = Vector3.zero;
-            GameObject cylinderHead = GameObject.Find("cylinder head(Clone)");
-            GameObject stockCarburator = GameObject.Find("carburator(Clone)");
-            GameObject block = GameObject.Find("block(Clone)");
+            GameObject cylinderHead = Database.databaseMotor.cylinderHead;
+            GameObject block = Database.databaseMotor.block;
             GameObject satsuma = GameObject.Find("SATSUMA(557kg, 248)");
             GameObject dashboard = GameObject.Find("dashboard(Clone)");
 
             // Setting up turbo parts
-            TurboParts turboParts = new TurboParts();
-            PartSettings ps = new PartSettings() { assembleType = AssembleType.static_rigidbodyDelete };
+            turboParts = new TurboParts();
+            PartSettings ps = new PartSettings() { setPhysicsMaterialOnInitialisePart = true, installEitherDirection = true };
             // Oil Lines
             Vector3 oilLinesTriggerPos = new Vector3(0.04f, -0.155f, -0.0845f);
             Vector3 oilLinesTriggerRot = new Vector3(270, 180, 0);
             turboParts.oilLines = Object.Instantiate(modAssets.oilLines).AddComponent<Part>();
+            turboParts.oilLines.name = "Turbo Oil Lines(xxxxx)";
             turboParts.oilLines.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-9.211566f, 0.3555823f, 8.223039f), rotation = new Vector3(1.59594524f, 328.505646f, 110.664665f) };
-            turboParts.oilLines.initPart(loadedSaveData.oilLines, ps, new Trigger("oilLinesTrigger", block, oilLinesTriggerPos, oilLinesTriggerRot, scale, false));
+            turboParts.oilLines.initPart(loadedSaveData.oilLines, ps, new Trigger("oilLinesTrigger", block, oilLinesTriggerPos, oilLinesTriggerRot));
             // Oil Cooler
             Vector3 oilCoolerTriggerPos = new Vector3(-0.00385f, -0.1566f, 1.58f);
             turboParts.oilCooler = Object.Instantiate(modAssets.oilCooler).AddComponent<Part>();
+            turboParts.oilCooler.name = "Oil Cooler(xxxxx)";
             turboParts.oilCooler.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-9.857974f, 0.375454068f, 8.366342f), rotation = new Vector3(51.8120346f, 270.4507f, 3.314321E-05f) };
-            turboParts.oilCooler.initPart(loadedSaveData.oilCooler, ps, new Trigger("oilCoolerTrigger", satsuma, oilCoolerTriggerPos, rotZero, scale, false));
+            turboParts.oilCooler.initPart(loadedSaveData.oilCooler, ps, new Trigger("oilCoolerTrigger", satsuma, oilCoolerTriggerPos, rotZero));
+            
             // Stock Carb Pipe
-            Vector3 carbPipeTriggerPos = new Vector3(0.0605f, -0.063f, 0.038f);
-            Vector3 carbPipeTriggerRot = new Vector3(-90, 0, 180);
+            Vector3 carbPipeTriggerPos = new Vector3(0.051f, -0.023f, -0.033f);
+            Vector3 carbPipeTriggerRot = new Vector3(270, 180, 0);
+
+            GameObject butterflyNutPrefab = carbParts.bowlCoverAssembly.transform.Find("butterfly nut").gameObject;            
+            butterflyNutPrefab.AddComponent<MeshCollider>().convex = true;
+            butterflyNutPrefab.sendToLayer(LayerMasksEnum.Parts);
+
+            Trigger carbPipeTrigger = new Trigger("carbPipeTrigger", carbParts.bowlCoverAssembly, carbPipeTriggerPos, carbPipeTriggerRot);
+            
+            BoltSettings carbPipeBoltSettings = new BoltSettings()
+            {                
+                boltSize = BoltSize.hand,
+                boltType = BoltType.custom,
+                customBoltPrefab = butterflyNutPrefab,
+                posDirection = Vector3.down,
+                rotDirection = Vector3.up,    
+                name = "Butterfly Nut(xxxxx)",
+                highlightBoltWhenActive = false,
+                activeWhenUninstalled = true,
+                parentBoltToTrigger = true,
+                parentBoltToTriggerIndex = 0,
+            };
+            Bolt carbPipeBolt = new Bolt(carbPipeBoltSettings, new Vector3(0.0675f, 0.116f, 0.0254f), new Vector3(90, 0, 0));
+            
             turboParts.carbPipe = Object.Instantiate(modAssets.carbPipe).AddComponent<Part>();
+            turboParts.carbPipe.name = "Turbo Stock Carb Pipe(xxxxx)";
             turboParts.carbPipe.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-9.787034f, 0.191437215f, 6.201254f), rotation = new Vector3(285.1606f, 51.1690636f, 175.335251f) };
-            turboParts.carbPipe.initPart(loadedSaveData.stockCarbPipe, ps, new Trigger("carbPipeTrigger", bowlCoverAssembly.gameObject, carbPipeTriggerPos, carbPipeTriggerRot, scale, false));
+            turboParts.carbPipe.initPart(loadedSaveData.stockCarbPipe, ps, new Bolt[] { carbPipeBolt }, carbPipeTrigger);
+            Object.Destroy(butterflyNutPrefab);
             // headers
             Vector3 headersTriggerPos = new Vector3(-0.0115f, -0.1105f, -0.04f);
             Vector3 headersTriggerRot = new Vector3(-90, 0, 180);
             turboParts.headers = Object.Instantiate(modAssets.headers).AddComponent<Part>();
+            turboParts.headers.name = "Turbo Headers(xxxxx)";
             turboParts.headers.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-9.909819f, 0.179119885f, 6.45177937f), rotation = new Vector3(324.365265f, 352.000732f, 179.9617f) };
-            turboParts.headers.initPart(loadedSaveData.headers, ps, new Trigger("headersTrigger", cylinderHead, headersTriggerPos, headersTriggerRot, scale, false));
+            turboParts.headers.initPart(loadedSaveData.headers, ps, new Trigger("headersTrigger", cylinderHead, headersTriggerPos, headersTriggerRot));
             // turbo
             Vector3 turboTriggerPos = new Vector3(-0.04f, -0.146f, -0.1425f);
             turboParts.turbo = Object.Instantiate(modAssets.turbo).AddComponent<Part>();
+            turboParts.turbo.name = "Turbo(xxxxx)";
             turboParts.turbo.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-10.0278788f, 0.2243311f, 6.13207769f), rotation = new Vector3(359.891632f, 344.759369f, 270.93338f) };
-            turboParts.turbo.initPart(loadedSaveData.turbo, ps, new Trigger("turboTrigger", turboParts.headers.gameObject, turboTriggerPos, rotZero, scale, false));
+            turboParts.turbo.initPart(loadedSaveData.turbo, ps, new Trigger("turboTrigger", turboParts.headers, turboTriggerPos, rotZero));
             // Air filter
             Vector3 airFilterTriggerPos = new Vector3(-0.11f, 0, 0);
             Vector3 airFilterTriggerRot = new Vector3(-90, 0, 0);
             turboParts.filter = Object.Instantiate(modAssets.airFilter).AddComponent<Part>();
+            turboParts.filter.name = "Turbo Stock Air Filter(xxxxx)";
             turboParts.filter.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-9.6119f, 0.378927648f, 8.4703455f), rotation = new Vector3(0, 313.72f, 270) };
-            turboParts.filter.initPart(loadedSaveData.airFilter, ps, new Trigger("airFilterTrigger", turboParts.turbo.gameObject, airFilterTriggerPos, airFilterTriggerRot, scale, false));
+            turboParts.filter.initPart(loadedSaveData.airFilter, ps, new Trigger("airFilterTrigger", turboParts.turbo, airFilterTriggerPos, airFilterTriggerRot));
             // High Flow Air filter
             turboParts.highFlowFilter = Object.Instantiate(modAssets.highFlowAirFilter).AddComponent<Part>();
+            turboParts.highFlowFilter.name = "Turbo High Flow Air Filter(xxxxx)";
             turboParts.highFlowFilter.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-9.758383f, 0.388716f, 8.516996f), rotation = new Vector3(22.13869f, 247.411392f, 266.338776f) };
             turboParts.highFlowFilter.initPart(loadedSaveData.highFlowAirFilter, ps, turboParts.filter.triggers);
             // Wastegate
             Vector3 wastgateTriggerPos = new Vector3(-0.054f, 0.023f, 0.0557f);
             turboParts.act = Object.Instantiate(modAssets.wastegateActuator).AddComponent<Part>();
+            turboParts.act.name = "Turbo Wastegate Actuator(xxxxx)";
             turboParts.act.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-9.953638f, 0.164577737f, 6.27556753f), rotation = new Vector3(35.10111f, 256.410431f, 189.827179f) };
-            turboParts.act.initPart(loadedSaveData.wastegate, ps, new Trigger("wastegateTrigger", turboParts.turbo.gameObject, wastgateTriggerPos, rotZero, scale, false));
-            // Down pipe
+            turboParts.act.initPart(loadedSaveData.wastegate, ps, new Trigger("wastegateTrigger", turboParts.turbo, wastgateTriggerPos, rotZero));
+            // Down pipe Race
             Vector3 downPipeTriggerPos = new Vector3(0.1434f, -0.0273f, 0.0732f);
+            Trigger downPipeTrigger = new Trigger("downPipeTrigger", turboParts.turbo, downPipeTriggerPos, rotZero);
             turboParts.downPipe = Object.Instantiate(modAssets.downPipe_race).AddComponent<Part>();
+            turboParts.downPipe.name = "Turbo Down Pipe (Race)(xxxxx)";
             turboParts.downPipe.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-10.1210308f, 0.205112815f, 6.258187f), rotation = new Vector3(304.177856f, 254.448318f, 288.865082f) };
-            turboParts.downPipe.initPart(loadedSaveData.downPipe, ps, new Trigger("downPipeTrigger", turboParts.turbo.gameObject, downPipeTriggerPos, rotZero, scale, false));
+            turboParts.downPipe.initPart(loadedSaveData.downPipeRace, ps, downPipeTrigger);
+            // Down pipe Straight
+            turboParts.downPipe2 = Object.Instantiate(modAssets.downPipe_race).AddComponent<Part>();
+            turboParts.downPipe2.name = "Turbo Down Pipe (Straight)(xxxxx)";
+            turboParts.downPipe2.transform.localScale = new Vector3(1, -1, 1);
+            turboParts.downPipe2.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(1566.848f, 5.702945f, 738.3788f), rotation = new Vector3(304.1781f, 271.5749f, 288.8701f) };
+            turboParts.downPipe2.initPart(loadedSaveData.downPipeStraight, ps, downPipeTrigger);
             // Boost gauge
             turboParts.boostGauge = Object.Instantiate(modAssets.boostGauge).AddComponent<Part>();
+            turboParts.boostGauge.name = "Turbo Boost Gauge(xxxxx)";
             turboParts.boostGauge.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-9.002147f, 0.36299932f, 8.077917f), rotation = new Vector3(8.19497363E-05f, 46.88491f, -1.2716353E-05f) };
-            Trigger gaugeTriggerDashboard = new Trigger("boostGaugeTriggerDashboard", dashboard, new Vector3(0.5f, -0.05f, 0.125f), new Vector3(265f, 180f, 0f), scale, false);
-            Trigger gaugeTriggerSteeringColumn = new Trigger("boostGaugeTriggerSteeringColumn", satsuma, new Vector3(-0.2580001f, 0.353999f, 0.3900005f), new Vector3(26.0001f, 358.0007f, 0.8386518f), scale, false);
-            Trigger gaugeTriggerShell = new Trigger("boostGaugeTriggerShell", satsuma, new Vector3(-0.5279999f, 0.6269986f, 0.3040009f), new Vector3(0, 342.0003f, 261.8372f), scale, false);
+            Trigger gaugeTriggerDashboard = new Trigger("boostGaugeTriggerDashboard", dashboard, new Vector3(0.5f, -0.05f, 0.125f), new Vector3(265f, 180f, 0f));
+            Trigger gaugeTriggerSteeringColumn = new Trigger("boostGaugeTriggerSteeringColumn", satsuma, new Vector3(-0.2580001f, 0.353999f, 0.3900005f), new Vector3(26.0001f, 358.0007f, 0.8386518f));
+            Trigger gaugeTriggerShell = new Trigger("boostGaugeTriggerShell", satsuma, new Vector3(-0.5279999f, 0.6269986f, 0.3040009f), new Vector3(0, 342.0003f, 261.8372f));
             turboParts.boostGauge.initPart(loadedSaveData.boostGauge, ps, gaugeTriggerDashboard, gaugeTriggerSteeringColumn, gaugeTriggerShell);
             // Intercooler
             turboParts.intercooler = Object.Instantiate(modAssets.intercooler).AddComponent<Part>();
+            turboParts.intercooler.name = "Turbo Intercooler(xxxxx)";
             turboParts.intercooler.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-8.642147f, 0.36299932f, 8.077917f), rotation = new Vector3(8.19497363E-05f, 46.88491f, -1.2716353E-05f) };
-            turboParts.intercooler.initPart(loadedSaveData.intercooler, ps, new Trigger("intercoolerTrigger", satsuma, new Vector3(0.5f, -0.05f, 0.125f), new Vector3(265f, 180f, 0f), scale, false));
+            turboParts.intercooler.initPart(loadedSaveData.intercooler, ps, new Trigger("intercoolerTrigger", satsuma, new Vector3(0.5f, -0.05f, 0.125f), new Vector3(265f, 180f, 0f)));
             // Hotside pipe
             turboParts.hotSidePipe = Object.Instantiate(modAssets.chargePipeHotSide_race).AddComponent<Part>();
+            turboParts.hotSidePipe.name = "Turbo Hotside Pipe(xxxxx)";
             turboParts.hotSidePipe.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-9.042147f, 0.36299932f, 8.077917f), rotation = new Vector3(8.19497363E-05f, 46.88491f, -1.2716353E-05f) };
-            turboParts.hotSidePipe.initPart(loadedSaveData.HotSidePipe, ps, new Trigger("hotsidepipeTrigger", turboParts.intercooler.gameObject, new Vector3(0.5f, -0.05f, 0.125f), new Vector3(265f, 180f, 0f), scale, false));
+            turboParts.hotSidePipe.initPart(loadedSaveData.HotSidePipe, ps, new Trigger("hotsidepipeTrigger", turboParts.intercooler, new Vector3(0.5f, -0.05f, 0.125f), new Vector3(265f, 180f, 0f)));
             // racing Carb pipe
-            turboParts.coldSidePipe = Object.Instantiate(modAssets.chargePipeHotSide_race).AddComponent<Part>();
+            Trigger coldSidePipeTrigger = new Trigger("racingCarbpipeTrigger", turboParts.intercooler.gameObject, new Vector3(0.5f, -0.05f, 0.125f), new Vector3(265f, 180f, 0f));
+            turboParts.coldSidePipe = Object.Instantiate(modAssets.chargePipeColdSide_race).AddComponent<Part>();
+            turboParts.coldSidePipe.name = "Turbo Racing Carb Pipe (Coldside)(xxxxx)";
             turboParts.coldSidePipe.defaultSaveInfo = new PartSaveInfo() { position = new Vector3(-10.142147f, 0.36299932f, 8.077917f), rotation = new Vector3(8.19497363E-05f, 46.88491f, -1.2716353E-05f) };
-            turboParts.coldSidePipe.initPart(loadedSaveData.racingCarbPipe, ps, new Trigger("racingCarbpipeTrigger", turboParts.intercooler.gameObject, new Vector3(0.5f, -0.05f, 0.125f), new Vector3(265f, 180f, 0f), scale, false));
+            turboParts.coldSidePipe.initPart(loadedSaveData.racingCarbPipe, ps, coldSidePipeTrigger);
 
             // Setting up turbo simulation
+
+/*          
             TurboSimulation.oilCooler = turboParts.oilCooler;
             TurboSimulation.oilLines = turboParts.oilLines;
             TurboSimulation.headers = turboParts.headers;
             TurboSimulation.carbPipe = turboParts.carbPipe;
             TurboSimulation.coldSidePipe = turboParts.coldSidePipe;
-            TurboSimulation.downPipe = turboParts.downPipe;
+            TurboSimulation.downPipeRace = turboParts.downPipe;
+            TurboSimulation.downPipeStraight = turboParts.downPipe2;
             TurboSimulation.hotSidePipe = turboParts.hotSidePipe;
             TurboSimulation.act = turboParts.act;
             TurboSimulation.boostGauge = turboParts.boostGauge;
@@ -427,39 +427,44 @@ namespace TommoJProductions.TurboMod
             TurboSimulation.highFlowFilter = turboParts.highFlowFilter;
             TurboSimulation.intercooler = turboParts.intercooler;
             turboSimulation = turboParts.turbo.gameObject.AddComponent<TurboSimulation>();
-            turboSimulation.loadedSaveData = new TurboSimulation.turboSimulationSaveData() { wastegatePsi = loadedSaveData.wastegatePsi, turboWear = loadedSaveData.turboWear, turboDestroyed = loadedSaveData.turboDestroyed };
+            turboSimulation.loadedSaveData = loadedSaveData.simulation;
+*/
+          
+            simulation = turboParts.turbo.gameObject.AddComponent<Simulation>();
+            simulation.setupParts(turboParts, carbParts, loadedSaveData.simulation);
 
-            // done
+
+            Database.databaseVehicles.satsuma.gameObject.AddComponent<VehiclePushStartLogic>();
+
             print("Initialized turbo parts");
+
         }
         /// <summary>
         /// Saves turbo parts to a file
         /// </summary>
-        private void saveParts(TurboModSaveData saveData = null)
+        private void saveParts()
         {
             // Written, 04.11.2020
 
-            if (saveData == null)
+            loadedSaveData = new TurboModSaveData
             {
-                loadedSaveData = new TurboModSaveData();
-                loadedSaveData.oilLines = TurboSimulation.oilLines.getSaveInfo();
-                loadedSaveData.oilCooler = TurboSimulation.oilCooler.getSaveInfo();
-                loadedSaveData.stockCarbPipe = TurboSimulation.carbPipe.getSaveInfo();
-                loadedSaveData.headers = TurboSimulation.headers.getSaveInfo();
-                loadedSaveData.turbo = TurboSimulation.turbo.getSaveInfo();
-                loadedSaveData.airFilter = TurboSimulation.filter.getSaveInfo();
-                loadedSaveData.highFlowAirFilter = TurboSimulation.highFlowFilter.getSaveInfo();
-                loadedSaveData.wastegate = TurboSimulation.act.getSaveInfo();
-                loadedSaveData.downPipe = TurboSimulation.downPipe.getSaveInfo();
-                loadedSaveData.boostGauge = TurboSimulation.boostGauge.getSaveInfo();
-                loadedSaveData.intercooler = TurboSimulation.intercooler.getSaveInfo();
-                loadedSaveData.HotSidePipe = TurboSimulation.hotSidePipe.getSaveInfo();
-                loadedSaveData.racingCarbPipe = TurboSimulation.coldSidePipe.getSaveInfo();
-                loadedSaveData.wastegatePsi = turboSimulation.wastegateRPM / TurboSimulation.RPM2PSI;
-                loadedSaveData.turboDestroyed = turboSimulation.destroyed;
-                loadedSaveData.turboWear = turboSimulation.wearMultipler;
-            }
-            SaveLoad.SerializeSaveFile(this, saveData ?? loadedSaveData, turboPartsSaveFileName);
+                oilLines = turboParts.oilLines.getSaveInfo(),
+                oilCooler = turboParts.oilCooler.getSaveInfo(),
+                stockCarbPipe = turboParts.carbPipe.getSaveInfo(),
+                headers = turboParts.headers.getSaveInfo(),
+                turbo = turboParts.turbo.getSaveInfo(),
+                airFilter = turboParts.filter.getSaveInfo(),
+                highFlowAirFilter = turboParts.highFlowFilter.getSaveInfo(),
+                wastegate = turboParts.act.getSaveInfo(),
+                downPipeRace = turboParts.downPipe.getSaveInfo(),
+                downPipeStraight = turboParts.downPipe2.getSaveInfo(),
+                boostGauge = turboParts.boostGauge.getSaveInfo(),
+                intercooler = turboParts.intercooler.getSaveInfo(),
+                HotSidePipe = turboParts.hotSidePipe.getSaveInfo(),
+                racingCarbPipe = turboParts.coldSidePipe.getSaveInfo(),
+                simulation = simulation.loadedSaveData
+            };
+            SaveLoad.SerializeSaveFile(this, loadedSaveData, turboPartsSaveFileName);
         }
         /// <summary>
         /// Loads turbo parts from a file
@@ -488,11 +493,15 @@ namespace TommoJProductions.TurboMod
         {
             // Written, 21.11.2021
 
-            PlayMakerFSM dyno = GameObject.Find("REPAIRSHOP/LOD/Dyno/dyno_computer/Computer").GetPlayMaker("Use");
-            FsmFloat time = dyno.FsmVariables.GetFsmFloat("TimeBought");
+            GameObject g = GameObject.Find("REPAIRSHOP/LOD/Dyno/dyno_computer/Computer");
+            if (g)
+            {
+                PlayMakerFSM dyno = g.GetPlayMaker("Use");
+                FsmFloat time = dyno.FsmVariables.GetFsmFloat("TimeBought");
 
-            time.Value = float.PositiveInfinity;
-            dyno.SendEvent("OPEN");
+                time.Value = float.PositiveInfinity;
+                dyno.SendEvent("OPEN");
+            } 
         }
 
         #endregion
@@ -505,12 +514,7 @@ namespace TommoJProductions.TurboMod
         }
         public override void OnNewGame()
         {
-            ModSave.Delete(turboPartsSaveFileName);
-        }
-        public override void PostLoad()
-        {
-            // Written, 26.10.2020
-
+            File.Delete(Path.Combine(ModLoader.GetModSettingsFolder(this), turboPartsSaveFileName));            
         }
         public override void OnLoad()
         {
@@ -523,11 +527,12 @@ namespace TommoJProductions.TurboMod
             }
             ConsoleCommand.Add(new testCaculations(turboSimulation));
 
-            print("{0} v{1}: Loaded", Name, Version);
+            print("{0} v{1}: Loaded", Name, Version);            
         }
 
         #endregion
 
+        /*// Debugging/Development tools
         bool reloaded = false;
         float reloadTextTime;
         public override void Update()
@@ -556,5 +561,6 @@ namespace TommoJProductions.TurboMod
                 }
             }
         }
+        */
     }
 }

@@ -12,64 +12,97 @@
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
-    <TargetFrameworkProfile>Unity Full v3.5</TargetFrameworkProfile>
+    <TargetFrameworkProfile>
+    </TargetFrameworkProfile>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
     <PlatformTarget>x64</PlatformTarget>
     <OutputPath>bin\x64\Debug\</OutputPath>
     <DefineConstants>DEBUG;x64;</DefineConstants>
     <Optimize>false</Optimize>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
     <PlatformTarget>x64</PlatformTarget>
     <OutputPath>bin\x64\Release\</OutputPath>
     <DefineConstants>x64</DefineConstants>
     <Optimize>false</Optimize>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
-      <HintPath>D:\Games\SteamApps\steamapps\common\My Summer Car\mysummercar_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <HintPath>F:\SteamLibrary\steamapps\common\My Summer Car\mysummercar_Data\Managed\Assembly-CSharp.dll</HintPath>
     </Reference>
     <Reference Include="cInput">
-      <HintPath>D:\Games\SteamApps\steamapps\common\My Summer Car\mysummercar_Data\Managed\cInput.dll</HintPath>
+      <HintPath>F:\SteamLibrary\steamapps\common\My Summer Car\mysummercar_Data\Managed\cInput.dll</HintPath>
     </Reference>
-    <Reference Include="modapi_v0142-alpha">
-      <HintPath>D:\Games\SteamApps\steamapps\common\My Summer Car\Mods\References\modapi_v0142-alpha.dll</HintPath>
+    <Reference Include="ModApi">
+      <HintPath>F:\SteamLibrary\steamapps\common\My Summer Car\Mods\References\ModApi.dll</HintPath>
     </Reference>
-    <Reference Include="MSCLoader, Version=1.1.1.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>D:\Games\SteamApps\steamapps\common\My Summer Car\mysummercar_Data\Managed\MSCLoader.dll</HintPath>
+    <Reference Include="MSCLoader">
+      <HintPath>F:\SteamLibrary\steamapps\common\My Summer Car\mysummercar_Data\Managed\MSCLoader.dll</HintPath>
     </Reference>
     <Reference Include="PlayMaker">
-      <HintPath>D:\Games\SteamApps\steamapps\common\My Summer Car\mysummercar_Data\Managed\PlayMaker.dll</HintPath>
+      <HintPath>F:\SteamLibrary\steamapps\common\My Summer Car\mysummercar_Data\Managed\PlayMaker.dll</HintPath>
     </Reference>
+    <Reference Include="System" />
     <Reference Include="UnityEngine">
-      <HintPath>D:\Games\SteamApps\steamapps\common\My Summer Car\mysummercar_Data\Managed\UnityEngine.dll</HintPath>
+      <HintPath>F:\SteamLibrary\steamapps\common\My Summer Car\mysummercar_Data\Managed\UnityEngine.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>F:\SteamLibrary\steamapps\common\My Summer Car\mysummercar_Data\Managed\UnityEngine.UI.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ButterflyNut.cs" />
-    <Compile Include="FsmStateActionCallback.cs" />
-    <Compile Include="PlayMakerExtentions.cs" />
+    <Compile Include="AirSim.cs" />
+    <Compile Include="BoostGauge.cs" />
+    <Compile Include="CalculateAirDensityEnum.cs" />
+    <Compile Include="CarbParts.cs" />
+    <Compile Include="Graph.cs" />
+    <Compile Include="GraphData.cs" />
+    <Compile Include="JetPart.cs" />
+    <Compile Include="PID.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>AssemblyInfo.tt</DependentUpon>
+    </Compile>
+    <Compile Include="Simulation.cs" />
+    <Compile Include="SimulationDebug.cs" />
+    <Compile Include="SimulationExtentions.cs" />
+    <Compile Include="SimulationSaveData.cs" />
     <Compile Include="testCaculations.cs" />
+    <Compile Include="TurboCompressorMap.cs" />
     <Compile Include="TurboParts.cs" />
     <Compile Include="TurboModSaveData.cs" />
     <Compile Include="TurboSimulation.cs" />
     <Compile Include="TurboModAssets.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TurboMod.cs" />
     <Compile Include="TurboSimulationExtentions.cs" />
     <Compile Include="VehiclePushStartLogic.cs" />
+    <Compile Include="WastegateAdjust.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Properties\AssemblyInfo.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>AssemblyInfo.cs</LastGenOutput>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <Service Include="{508349B6-6B84-4DF5-91F0-309BEEBAD82D}" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>if "$(ConfigurationName)" == "Debug" (
-copy "$(TargetPath)" "D:\Games\SteamApps\steamapps\common\My Summer Car\Mods" /y
-copy "$(TargetDir)$(TargetName).pdb" "D:\Games\SteamApps\steamapps\common\My Summer Car\Mods" /y
-cd "D:\Games\SteamApps\steamapps\common\My Summer Car\Mods"
-call "D:\Games\SteamApps\steamapps\common\My Summer Car\Mods\debug.bat"
+copy "$(TargetPath)" "F:\SteamLibrary\steamapps\common\My Summer Car\Mods" /y
+copy "$(TargetDir)$(TargetName).pdb" "F:\SteamLibrary\steamapps\common\My Summer Car\Mods" /y
+cd "F:\SteamLibrary\steamapps\common\My Summer Car\Mods"
+call "F:\SteamLibrary\steamapps\common\My Summer Car\Mods\debug.bat"
 ) ELSE (
-copy "$(TargetPath)" "D:\Games\SteamApps\steamapps\common\My Summer Car\Mods" /y
+copy "$(TargetPath)" "F:\SteamLibrary\steamapps\common\My Summer Car\Mods" /y
 )</PostBuildEvent>
+  </PropertyGroup>
+  <PropertyGroup>
+    <PreBuildEvent>"$(DevEnvDir)TextTransform.exe" -a !!BuildConfiguration!$(Configuration) "$(ProjectDir)Properties\AssemblyInfo.tt"</PreBuildEvent>
   </PropertyGroup>
 </Project>
