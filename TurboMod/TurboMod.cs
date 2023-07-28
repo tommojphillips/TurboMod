@@ -2,11 +2,12 @@
 using MSCLoader;
 using System;
 using System.IO;
+
 using TommoJProductions.ModApi;
 using TommoJProductions.ModApi.Attachable;
 using TommoJProductions.ModApi.Database;
+
 using UnityEngine;
-using static TommoJProductions.ModApi.Attachable.Part;
 using Object = UnityEngine.Object;
 
 namespace TommoJProductions.TurboMod
@@ -19,16 +20,19 @@ namespace TommoJProductions.TurboMod
 
         public override string ID => "TurboMod";
         public override string Name => "Turbo Mod";
-        public override string Description => description;
+        public override string Description => DESCRIPTION;
         public override string Version => VersionInfo.version;
         public override string Author => "tommojphillips";
 
         #endregion
 
+        public static readonly string DESCRIPTION =   "CONFIG: " + (VersionInfo.IS_64_BIT ? "x64" : "x86") + " | " + 
+            (VersionInfo.IS_DEBUG_CONFIG ? "Debug" : "Release") + "\n Latest Release: " + VersionInfo.lastestRelease +
+            "\nComplied With: ModApi v" + ModApi.VersionInfo.version + " BUILD " + ModApi.VersionInfo.build + ".";
+
         #region Fields
 
         public string turboPartsSaveFileName = "turboparts_savedata";
-        private readonly string description = $"CONFIG: {(VersionInfo.IS_64_BIT ? "x64" : "x86")} | {(VersionInfo.IS_DEBUG_CONFIG ? "Debug" : "Release")}\nLatest Release Date: {VersionInfo.lastestRelease}";
 
         /// <summary>
         /// Represents the turbo mod assets.
@@ -72,7 +76,7 @@ namespace TommoJProductions.TurboMod
         {
             // Written, 26.10.2020
 
-            ModConsole.Print(string.Format("Turbo Mod: " + inMessage, _objects));
+            ModClient.print(string.Format("Turbo Mod: " + inMessage, _objects));
         }
 
         // PRIVATE METHODS
@@ -278,7 +282,7 @@ namespace TommoJProductions.TurboMod
 
             TurboSimulation.carbParts = carbParts;
 
-            ModConsole.Print("init blow through carb parts");
+            ModClient.print("init blow through carb parts");
         }
         /// <summary>
         /// Initializes all turbo parts
@@ -433,8 +437,6 @@ namespace TommoJProductions.TurboMod
             simulation = turboParts.turbo.gameObject.AddComponent<Simulation>();
             simulation.setupParts(turboParts, carbParts, loadedSaveData.simulation);
 
-
-            Database.databaseVehicles.satsuma.gameObject.AddComponent<VehiclePushStartLogic>();
 
             print("Initialized turbo parts");
 

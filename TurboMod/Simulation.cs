@@ -5,12 +5,12 @@ using HutongGames.PlayMaker;
 using HutongGames.PlayMaker.Actions;
 using MSCLoader;
 
-using TommoJProductions.ModApi;
 using TommoJProductions.ModApi.Attachable;
+using TommoJProductions.ModApi;
 using TommoJProductions.ModApi.Database;
 using static TommoJProductions.ModApi.ModClient;
-
 using static TommoJProductions.TurboMod.SimulationExtentions;
+
 using System.Collections;
 using Random = UnityEngine.Random;
 
@@ -157,7 +157,7 @@ namespace TommoJProductions.TurboMod
         private void Start()
         {
             if (!partsSetUp)
-                ModConsole.Print("[TurboMod.Sim] error: turbo and/or carb parts are not set up!, Turbo Sim will not work.");
+                print("[TurboMod.Sim] error: turbo and/or carb parts are not set up!, Turbo Sim will not work.");
 
             getReferences();
 

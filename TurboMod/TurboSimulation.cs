@@ -4,11 +4,11 @@ using MSCLoader;
 using System;
 using System.Linq;
 using System.Collections;
-using TommoJProductions.ModApi;
-using TommoJProductions.ModApi.Attachable;
 using UnityEngine;
 using Random = UnityEngine.Random;
 using static TommoJProductions.ModApi.ModClient;
+using TommoJProductions.ModApi.Attachable;
+using TommoJProductions.ModApi;
 using TommoJProductions.ModApi.Database;
 
 namespace TommoJProductions.TurboMod
@@ -198,7 +198,7 @@ namespace TommoJProductions.TurboMod
         private float turboTargetRPM;
         private float turboRPM;
         private float afFactor;
-        private float afrAbsolute;
+        private float afr;
         private float mixtureMedian;
         private float systemDepression;
         private readonly float systemDepressionRpm;
@@ -252,7 +252,7 @@ namespace TommoJProductions.TurboMod
         private FsmFloat satsumaSpeedKmh;
         private FsmFloat choke;
         private FsmString InteractText;
-        private GameObject turboFan;
+        private GameObject turbineModel;
         private GameObject stockFilterTrigger;
         private GameObject headerTriggers;
         private GameObject soundSpool;
@@ -507,7 +507,7 @@ namespace TommoJProductions.TurboMod
                                 $"- Mixture Multiplier5: {calculateMixtureMultipler5?.Value.round(3) ?? 0}\n" +
                                 $"- Air Density: {airDensity.Value.round(3)}\n" +
                                 $"- Factor: {afFactor.round(3)}\n" +
-                                $"- Ratio: {afrAbsolute.round(2)}\n" +
+                                $"- Ratio: {afr.round(2)}\n" +
                                 $"- Median: {mixtureMedian.round(2)}\n" +
                                 $"- Ideal: {checkMixtureRich?.float2.Value.round(2) ?? -1} ~ {checkMixtureLean?.float2.Value.round(2) ?? -1}\n" +
                                 $"- Fuel Pump Efficiency", fuelPumpEfficiency.Value);
@@ -618,7 +618,7 @@ namespace TommoJProductions.TurboMod
                             drawProperty("<color=" + (!isExhaust ? "yellow>turbo setup != exhaust</color>" : "blue>turbo == exhaust</color>"));
                             drawProperty("<color=" + (!isFiltered ? "yellow>Unfiltered</color>" : "blue>Filtered</color>"));
                             drawProperty($"Air-Fuel: <b>{printAFState()}</b>");
-                            drawProperty($"Turbo Fan: <color={(turboFan.activeInHierarchy ? $"green>Active" : "yellow>Inactive")}</color> | Turbo Spin Rot: {turboSpin}");
+                            drawProperty($"Turbine: <color={(turbineModel.activeInHierarchy ? $"green>Active" : "yellow>Inactive")}</color> | Turbo Spin Rot: {turboSpin}");
                             drawProperty(stockCarbInstalled.Value ? $"Carb setup: {(carbInstall ? "OK" : canCarbWork ? "FUNCTIONAL" : "NOT WORKING")}" : raceCarbInstalled.Value ? $"Race carb setup: {(raceCarbInstall ? "OK" : "NOT WORKING")}" : "No Carb Found");
                             drawProperty($"Clutch: <color={(drivetrain.torque > drivetrain.clutch.maxTorque ? "red>SLIPPING" : "green>OK")}</color>");
                             drawProperty($"Clutch:\n" +
@@ -736,7 +736,7 @@ namespace TommoJProductions.TurboMod
                 turboNeedleObject = boostGauge.transform.GetChild(2).gameObject;
                 headerTriggers = cylinderHead.transform.FindChild("Triggers Headers").gameObject;
                 stockFilterTrigger = carburator.transform.FindChild("trigger_airfilter").gameObject;
-                turboFan = GameObject.Find("motor_turbocharger_blades");
+                turbineModel = GameObject.Find("motor_turbocharger_blades");
                 fuelGo = engine.transform.Find("Fuel").gameObject;
                 fuel = fuelGo.GetComponent<PlayMakerFSM>();
                 fuelEvent = fuelGo.GetComponents<PlayMakerFSM>()[1];
@@ -865,17 +865,17 @@ namespace TommoJProductions.TurboMod
             if (engineCranked)
             {
                 rv = "<color=";
-                if (afrAbsolute >= checkMixtureLean.float2.Value)
+                if (afr >= checkMixtureLean.float2.Value)
                     rv += "red>Lean";
-                else if (afrAbsolute >= checkMixtureRich.float2.Value)
+                else if (afr >= checkMixtureRich.float2.Value)
                     rv += "green>Optimal";
-                else if (afrAbsolute >= checkMixtureSuperRich.float2.Value)
+                else if (afr >= checkMixtureSuperRich.float2.Value)
                     rv += "yellow>Rich";
-                else if (afrAbsolute >= checkMixtureSputter.float2.Value)
+                else if (afr >= checkMixtureSputter.float2.Value)
                     rv += "orange>Super Rich";
-                else if (afrAbsolute >= checkMixtureOff.float2.Value)
+                else if (afr >= checkMixtureOff.float2.Value)
                     rv += "red>Sputter";
-                else if (afrAbsolute < checkMixtureOff.float2.Value)
+                else if (afr < checkMixtureOff.float2.Value)
                     rv += "red>Off (Too Rich)";
                 else
                     rv += "red>ERR";
@@ -890,10 +890,10 @@ namespace TommoJProductions.TurboMod
         }
         private void turboCondCheck()
         {
-            if (turboFan.gameObject.isPlayerLookingAt())
+            if (turbineModel.gameObject.isPlayerLookingAt())
             {
                 guiUse = true;
-                turboFan.transform.localEulerAngles = new Vector3(turboSpin, 0f, 0f);
+                turbineModel.transform.localEulerAngles = new Vector3(turboSpin, 0f, 0f);
                 if ((isFiltered && !isExhaust) || (isExhaust && !isFiltered))
                 {
                     if (cInput.GetButtonUp("Use"))
@@ -1123,8 +1123,8 @@ namespace TommoJProductions.TurboMod
             // Written, 25.04.2022
 
             turboSpin += turboRPM / MAX_WASTEGATE_RPM * 359;
-            if (turboFan.activeInHierarchy)
-                turboFan.transform.localEulerAngles = new Vector3(turboSpin, 0f, 0f);
+            if (turbineModel.activeInHierarchy)
+                turbineModel.transform.localEulerAngles = new Vector3(turboSpin, 0f, 0f);
             if (turboSpin > 359)
                 turboSpin = 0;
         }
@@ -1134,14 +1134,14 @@ namespace TommoJProductions.TurboMod
             float afm = checkMixtureAirFuelMixture.float2.Value;
             mixtureMedian = ((checkMixtureLean.float2.Value - rich) / 2) + rich;
 
-            afrAbsolute = mixture.Value * afm;
+            afr = mixture.Value * afm;
 
-            if (afrAbsolute > mixtureMedian)
-                afFactor = afm / afrAbsolute;
-            else if (afrAbsolute > rich)
-                afFactor = mixtureMedian / afrAbsolute;
+            if (afr > mixtureMedian)
+                afFactor = afm / afr;
+            else if (afr > rich)
+                afFactor = mixtureMedian / afr;
             else
-                afFactor = afrAbsolute / afm;
+                afFactor = afr / afm;
         }
         private void checkMixture(bool pipeWorking)
         {
@@ -1455,14 +1455,14 @@ namespace TommoJProductions.TurboMod
                     timeBoosting += Time.deltaTime;
                     if (applyFuelStarveEvent)
                     {
-                        if (PSI > maxBoostFuel || afrAbsolute > checkMixtureLean.float2.Value * 1.2f)
+                        if (PSI > maxBoostFuel || afr > checkMixtureLean.float2.Value * 1.2f)
                         {
-                            fuelStarveEvent(afrAbsolute > checkMixtureLean.float2.Value * 1.65f);
+                            fuelStarveEvent(afr > checkMixtureLean.float2.Value * 1.65f);
                         }
                     }
-                    if (!onThrottlePedal || afrAbsolute < checkMixtureRich.float2.Value)
+                    if (!onThrottlePedal || afr < checkMixtureRich.float2.Value)
                     {
-                        exhaustCrackle(afrAbsolute < checkMixtureSputter.float2.Value);
+                        exhaustCrackle(afr < checkMixtureSputter.float2.Value);
                     }
                 }
                 if (turboSurging && surgeRoutine == null)
@@ -1772,7 +1772,7 @@ namespace TommoJProductions.TurboMod
         }
         private void turboFanCheck()
         {
-            turboFan.SetActive(!destroyed && !(isFiltered && (downPipeRace.installed || downPipeStraight.installed) && turbo.installed && headers.installed));
+            turbineModel.SetActive(!destroyed && !(isFiltered && (downPipeRace.installed || downPipeStraight.installed) && turbo.installed && headers.installed));
         }
         private void onCarbSetup()
         {

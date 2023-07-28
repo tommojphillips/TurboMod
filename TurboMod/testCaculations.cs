@@ -1,5 +1,7 @@
 ﻿using MSCLoader;
 
+using TommoJProductions.ModApi;
+
 namespace TommoJProductions.TurboMod
 {
     public class testCaculations : ConsoleCommand
@@ -29,7 +31,7 @@ namespace TommoJProductions.TurboMod
                         if (argsNumLevel == 1)
                         {
                             if (float.TryParse(args[1], out float _rs))
-                                ModConsole.Print($"{arg0}: {turboSim.calculateAirDensity(_rs, 24)}");
+                                ModClient.print($"{arg0}: {turboSim.calculateAirDensity(_rs, 24)}");
                             else
                                 ModConsole.Warning($"{arg0} expects 1 argument oftype<FLOAT>, the pressure in pounds per square inch (PSI)");
                         }
@@ -41,7 +43,7 @@ namespace TommoJProductions.TurboMod
                         if (argsNumLevel == 1)
                         {
                             if (float.TryParse(args[1], out float _rs))
-                                ModConsole.Print($"{arg0}: {turboSim.calculateSaturationVapourPressure(_rs)}");
+                                ModClient.print($"{arg0}: {turboSim.calculateSaturationVapourPressure(_rs)}");
                             else
                                 ModConsole.Warning($"{arg0} expects 1 argument oftype<FLOAT>, the temperature in C");
                         }
@@ -53,7 +55,7 @@ namespace TommoJProductions.TurboMod
                         if (argsNumLevel == 2)
                         {
                             if (float.TryParse(args[1], out float _rs) && float.TryParse(args[2], out float _rs1))
-                                ModConsole.Print($"{arg0}: {turboSim.calculateDewPoint(_rs, _rs1)}");
+                                ModClient.print($"{arg0}: {turboSim.calculateDewPoint(_rs, _rs1)}");
                             else
                                 ModConsole.Warning($"{arg0} expects 2 arguments\noftype<FLOAT>, the temperature in C\noftype<FLOAT>, the relative humidity in percent (0-1)");
                         }
@@ -66,7 +68,7 @@ namespace TommoJProductions.TurboMod
                         if (argsNumLevel == 0)
                         {
                             turboSim.calculateAtmosphericPressure();
-                            ModConsole.Print($"{arg0}: {turboSim.atmosphericPressure}");
+                            ModClient.print($"{arg0}: {turboSim.atmosphericPressure}");
                         }
                         else
                             ModConsole.Warning($"{arg0} expects 0 arguments");

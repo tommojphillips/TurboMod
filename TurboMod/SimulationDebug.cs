@@ -117,28 +117,7 @@ namespace TommoJProductions.TurboMod
                 drawProperty("VALUES 2");
 
                 if (drawDrivetrainDebugValues)
-                {
-                    // DRIVETRAIN
-                    float wheelAngularVelocity = Mathf.Max(sim.drivetrain.poweredWheels[0].angularVelocity, sim.drivetrain.poweredWheels[1].angularVelocity);
-                    float wheelRpm = wheelAngularVelocity * sim.drivetrain.angularVelo2RPM;
-                    float ratio = sim.drivetrain.ratio;
-                    float clutchRpm = wheelRpm * ratio;
-
-                    drawProperty("--------------DRIVETRAIN-------------");
-                    drawProperty("wheel angular velocity", wheelAngularVelocity.round(2));
-                    drawProperty("wheel rpm", wheelRpm.round(2));
-                    drawProperty("clutch rpm", clutchRpm.round(2));
-                    drawProperty("clutch drag impulse", sim.drivetrain.clutchDragImpulse.round(2));
-                    drawProperty("clutch drag impulse", sim.drivetrain.clutch.GetDragImpulse(
-                        sim.drivetrain.rpm * sim.drivetrain.RPM2angularVelo,
-                        wheelAngularVelocity * ratio,
-                      sim.drivetrain.engineInertia * sim.drivetrain.powerMultiplier * sim.drivetrain.externalMultiplier,
-                    sim.drivetrain.drivetrainInertia * sim.drivetrain.powerMultiplier * sim.drivetrain.externalMultiplier + sim.drivetrain.poweredWheels.Sum(p => p.rotationalInertia),
-                           ratio,
-                sim.drivetrain.poweredWheels.Sum(p => p.wheelImpulse),
-            (sim.drivetrain.torque - sim.drivetrain.frictionTorque + sim.drivetrain.startTorque) * Time.deltaTime).round(2));
-                    drawProperty("Push starting", VehiclePushStartLogic.pushStarting);
-                    drawProperty("engine speed", VehiclePushStartLogic.engineSpeed);
+                {   
                     drawProperty("-----------------------------------");
 
                     drawProperty(sim.surgeRoutine == null ? "OK" : "Surging");
@@ -183,12 +162,12 @@ namespace TommoJProductions.TurboMod
             {
                 if (drawPushStartDebugEdits)
                 {
-                    drawPropertyBool("Will engine start", ref VehiclePushStartLogic.engineWillStart);
-                    drawPropertyBool("Push start logic enabled", ref VehiclePushStartLogic.pushStartLogicEnabled);
+                    //drawPropertyBool("Will engine start", ref VehiclePushStartLogic.engineWillStart);
+                    //drawPropertyBool("Push start logic enabled", ref VehiclePushStartLogic.pushStartLogicEnabled);
                     drawProperty("Start Torque", sim.drivetrain.startTorque);
                     drawProperty("Torque", sim.drivetrain.torque);
                     drawProperty("Clutch pos", sim.drivetrain.clutch.GetClutchPosition());
-                    drawProperty("Clutch Drag Impluse", VehiclePushStartLogic.clutchDragImplulse);
+                    //drawProperty("Clutch Drag Impluse", VehiclePushStartLogic.clutchDragImplulse);
                     drawProperty("Engine Friction Factor", sim.drivetrain.engineFrictionFactor);
                 }
 

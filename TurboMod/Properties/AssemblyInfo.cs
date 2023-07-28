@@ -1,37 +1,52 @@
-﻿using System.Reflection;
+﻿// VERSION 1.3
+using System.Reflection;
 using System.Resources;
 
 // General Information
-[assembly: AssemblyTitle("Turbo Mod")]
-[assembly: AssemblyDescription("A turbo mod for My Summer Car")]
+[assembly: AssemblyTitle("TurboMod")]
+[assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("TommoJProductions")]
+[assembly: AssemblyCompany("Tommo J. Productions")]
 [assembly: AssemblyProduct("TurboMod")]
-[assembly: AssemblyCopyright("Copyright © Tommo J. Productions 2022")]
-[assembly: AssemblyTrademark("Azine")]
-[assembly: AssemblyCulture("")]
+[assembly: AssemblyCopyright("Tommo J. Productions Copyright © 2023")]
 [assembly: NeutralResourcesLanguage("en-AU")]
+
 // Version information
-[assembly: AssemblyVersion("0.1.457.3")]
-//[assembly: AssemblyFileVersion("0.1.457.3")]
+[assembly: AssemblyVersion("0.2.1.64")]
+[assembly: AssemblyFileVersion("0.2.1.64")]
 
-public class VersionInfo
+namespace TommoJProductions.TurboMod
 {
-	public const string lastestRelease = "03.04.2023 07:17 PM";
-	public const string version = "0.1.457.3";
-
+    
     /// <summary>
-    /// Represents if the mod has been complied for x64
+    /// Represents the version info for TurboMod
     /// </summary>
-    #if x64
-        internal const bool IS_64_BIT = true;
-    #else
-        internal const bool IS_64_BIT = false;
-    #endif
-    #if DEBUG
-        internal const bool IS_DEBUG_CONFIG = true;
-    #else
-        internal const bool IS_DEBUG_CONFIG = false;
-    #endif
-}
+    public class VersionInfo
+    {
+        /// <summary>
+        /// Represents latest release version date. Format: dd:MM:yyyy hh:mm tt
+        /// </summary>
+	    public const string lastestRelease = "28.07.2023 06:50 PM";
+        /// <summary>
+        /// Represents current version.
+        /// </summary>
+	    public const string version = "0.2.1.64";
 
+        /// <summary>
+        /// Represents if the mod has been complied for x64
+        /// </summary>
+        #if x64
+            internal const bool IS_64_BIT = true;
+        #else
+            internal const bool IS_64_BIT = false;
+        #endif
+        /// <summary>
+        /// Represents if the mod has been complied in Debug mode
+        /// </summary>
+        #if DEBUG
+            internal const bool IS_DEBUG_CONFIG = true;
+        #else
+            internal const bool IS_DEBUG_CONFIG = false;
+        #endif
+    }
+}
